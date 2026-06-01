@@ -1,0 +1,43 @@
+{
+  "info": {
+    "name": "EduSmart API v1.1",
+    "description": "Postman collection cho EduSmart backend. Import file này vào Postman để test các endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        { "name": "Login", "request": { "method": "POST", "url": "{{base}}/auth/login", "body": { "mode": "raw", "raw": "{\"email\":\"admin@edusmart.local\",\"password\":\"admin123\"}" } } },
+        { "name": "Me", "request": { "method": "GET", "url": "{{base}}/auth/me" } },
+        { "name": "Refresh", "request": { "method": "POST", "url": "{{base}}/auth/refresh" } }
+      ]
+    },
+    {
+      "name": "Scores",
+      "item": [
+        { "name": "Enter Score", "request": { "method": "POST", "url": "{{base}}/scores" } },
+        { "name": "Get By Student", "request": { "method": "GET", "url": "{{base}}/scores/student/:student_id?semester=1&school_year=2024-2025" } },
+        { "name": "Export PDF", "request": { "method": "GET", "url": "{{base}}/scores/student/:student_id/pdf" } }
+      ]
+    },
+    {
+      "name": "Assignments (v1.1)",
+      "item": [
+        { "name": "List", "request": { "method": "GET", "url": "{{base}}/assignments" } },
+        { "name": "Create", "request": { "method": "POST", "url": "{{base}}/assignments" } },
+        { "name": "My Assignments", "request": { "method": "GET", "url": "{{base}}/assignments/me" } }
+      ]
+    },
+    {
+      "name": "Chat AI Widget",
+      "item": [
+        { "name": "Send Message", "request": { "method": "POST", "url": "{{base}}/chat/message", "body": { "mode": "raw", "raw": "{\"message\":\"Điểm con tôi môn Toán?\"}" } } },
+        { "name": "End Session", "request": { "method": "POST", "url": "{{base}}/chat/end-session" } }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "base", "value": "http://localhost:3001/api" }
+  ]
+}
