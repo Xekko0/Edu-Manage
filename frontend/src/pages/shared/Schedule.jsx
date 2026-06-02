@@ -1,5 +1,5 @@
 /** S12 — Lịch học tuần (ca sáng/chiều, trùng lịch, GV xem/sửa tiết mình). */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import useAuth from '../../hooks/useAuth';
 import useStudentContext from '../../hooks/useStudentContext';
@@ -40,7 +40,9 @@ export default function Schedule() {
   const [items, setItems] = useState([]);
   const [allClasses, setAllClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mineOnly, setMineOnly] = useState(user?.role === 'subject');
+  /** Mặc định xem TKB cả lớp; bật lọc chỉ tiết mình dạy khi cần. */
+  const [mineOnly, setMineOnly] = useState(false);
+  const [mineClassFilter, setMineClassFilter] = useState('');
   const [editSlot, setEditSlot] = useState(null);
   const [roomEdit, setRoomEdit] = useState('');
   const [moveForm, setMoveForm] = useState({ day_of_week: 1, period: 1, session: 'morning' });
@@ -106,6 +108,33 @@ export default function Schedule() {
   }, [classId, mineOnly, isTeacher, canViewFullClass, isFamily]);
 
   useEffect(() => { load(); }, [load]);
+
+  const mineClassOptions = useMemo(() => {
+    if (!isTeacher || !mineOnly) return [];
+    const map = new Map();
+    items.forEach((s) => {
+      const id = s.class_id ?? s.class?.id;
+      const name = s.class?.name || teachingClasses.find((c) => c.id === id)?.name || `Lớp #${id}`;
+      if (id) map.set(id, name);
+    });
+    return [...map.entries()].map(([id, name]) => ({ id: String(id), name }));
+  }, [items, isTeacher, mineOnly, teachingClasses]);
+
+  useEffect(() => {
+    if (!mineOnly || mineClassOptions.length === 0) return;
+    setMineClassFilter((prev) => {
+      if (prev && mineClassOptions.some((c) => c.id === prev)) return prev;
+      return mineClassOptions[0].id;
+    });
+  }, [mineOnly, mineClassOptions]);
+
+  const displayedItems = useMemo(() => {
+    if (!isTeacher || !mineOnly) return items;
+    if (!mineClassFilter || mineClassFilter === 'all') return items;
+    return items.filter(
+      (s) => String(s.class_id ?? s.class?.id) === String(mineClassFilter),
+    );
+  }, [items, isTeacher, mineOnly, mineClassFilter]);
 
   const isOwnSlot = (slot) => slot && Number(slot.teacher_id) === Number(user?.id);
   const canEditSlot = (slot) => isTeacher && slot && isOwnSlot(slot);
@@ -192,7 +221,7 @@ export default function Schedule() {
     }
   };
 
-  const conflictCount = items.filter(
+  const conflictCount = displayedItems.filter(
     (i) => isOwnSlot(i) && i.conflictTypes?.length > 0,
   ).length;
 
@@ -234,6 +263,9 @@ export default function Schedule() {
               } ${conflicts.length && isOwnSlot(slot) ? 'ring-2 ring-red-500 bg-red-50' : 'bg-slate-50'}`}
             >
               <div className="font-semibold text-brand">{slot.subject?.name}</div>
+              {mineOnly && slot.class?.name && (
+                <div className="text-slate-600 font-medium">{slot.class.name}</div>
+              )}
               {(!isTeacher || !mineOnly) && (
                 <div className="text-slate-500">{slot.teacher?.full_name}</div>
               )}
@@ -260,14 +292,30 @@ export default function Schedule() {
     <div>
       <PageHeader title={mineOnly && isTeacher ? 'Lịch dạy của tôi' : 'Lịch học tuần'}>
         {isTeacher && (
-          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap" title="Bật: chỉ các tiết bạn dạy (có thể nhiều lớp). Tắt: TKB đầy đủ của một lớp.">
             <input
               type="checkbox"
               checked={mineOnly}
-              onChange={(e) => setMineOnly(e.target.checked)}
+              onChange={(e) => {
+                setMineOnly(e.target.checked);
+                if (!e.target.checked && (homeroomClass?.id || teachingClasses[0]?.id)) {
+                  setClassId(String(homeroomClass?.id || teachingClasses[0]?.id));
+                }
+              }}
             />
-            Chỉ hiện tiết của tôi
+            Chỉ tiết tôi dạy
           </label>
+        )}
+        {isTeacher && mineOnly && mineClassOptions.length > 1 && (
+          <Select
+            value={mineClassFilter}
+            onChange={(e) => setMineClassFilter(e.target.value)}
+            className="w-36"
+          >
+            {mineClassOptions.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </Select>
         )}
         {canPickClass && (
           <Select value={classId} onChange={(e) => setClassId(e.target.value)} className="w-40">
@@ -292,9 +340,15 @@ export default function Schedule() {
         </div>
       </PageHeader>
 
+      {isTeacher && mineOnly && (
+        <p className="mb-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          <strong>Lịch dạy của tôi</strong> — chỉ các tiết bạn được phân công (có thể khác lớp).
+          Tắt «Chỉ tiết tôi dạy» để xem <strong>TKB đầy đủ của cả lớp</strong> (mọi giáo viên, mọi môn).
+        </p>
+      )}
       {isTeacher && !mineOnly && (
         <p className="mb-2 text-sm text-slate-600">
-          Đang xem TKB cả lớp. Nhấn vào <strong>tiết của bạn</strong> để chỉnh phòng hoặc chuyển tiết.
+          Đang xem <strong>TKB cả lớp</strong>. Nhấn tiết của bạn để sửa phòng / chuyển tiết.
         </p>
       )}
 
@@ -306,16 +360,16 @@ export default function Schedule() {
 
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>
-      ) : !items.length ? (
-        <EmptyState message="Chưa có thời khóa biểu cho lựa chọn này." />
+      ) : !displayedItems.length ? (
+        <EmptyState message={mineOnly ? 'Bạn chưa có tiết dạy trong lựa chọn này.' : 'Chưa có thời khóa biểu cho lựa chọn này.'} />
       ) : (
         <ScheduleGridTable
-          items={items}
+          items={displayedItems}
           session={session}
-          mineOnly={false}
+          mineOnly={mineOnly && isTeacher}
           userId={user?.id}
           showTeacher={!isTeacher || !mineOnly}
-          renderCell={isTeacher ? renderCell : undefined}
+          renderCell={isTeacher && !mineOnly ? renderCell : undefined}
         />
       )}
 

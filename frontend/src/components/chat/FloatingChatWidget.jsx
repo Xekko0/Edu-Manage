@@ -1,16 +1,17 @@
 /**
- * AI Chatbot Widget — Floating Chat Bubble (SRS 2.7).
- * Chỉ hiển thị với Phụ huynh (parent) và Học sinh (student).
+ * AI Chatbot Widget — PH/HS + Admin/Giáo viên.
  */
 import useAuth from '../../hooks/useAuth';
 import useChatStore from '../../store/chatStore';
 import ChatPopup from './ChatPopup';
 
+const AI_ROLES = ['parent', 'student', 'admin', 'subject', 'homeroom'];
+
 export default function FloatingChatWidget() {
   const { user } = useAuth();
   const { open, hasNewSuggestion, toggle } = useChatStore();
 
-  if (!user || !['parent', 'student'].includes(user.role)) return null;
+  if (!user || !AI_ROLES.includes(user.role)) return null;
 
   return (
     <>

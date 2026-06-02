@@ -34,7 +34,10 @@ export default function useTeacherClasses() {
 
         // Giáo viên (role=subject) có thể được gán làm GVCN qua classes.homeroom_teacher_id
         if (user.role === 'subject' || user.role === 'admin') {
-          const hr = allClasses.find((c) => c.homeroomTeacher?.id === user.id);
+          const hr = allClasses.find(
+            (c) => Number(c.homeroomTeacher?.id) === Number(user.id)
+              || Number(c.homeroom_teacher_id) === Number(user.id),
+          );
           setHomeroomClass(hr || null);
         }
 

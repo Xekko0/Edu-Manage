@@ -113,7 +113,8 @@ const PERMISSIONS = Object.freeze({
   'report.class'              : [ROLES.ADMIN, ROLES.HOMEROOM],
 
   // ===== AI CHATBOT WIDGET =====
-  'chat.use'                  : [ROLES.PARENT, ROLES.STUDENT],
+  'chat.use'                  : [ROLES.PARENT, ROLES.STUDENT, ROLES.ADMIN, ROLES.SUBJECT, ROLES.HOMEROOM],
+  // 5 persona SRS: admin, gvcn/gvbm (subject+scope), parent, student
 });
 
 /** Kiểm tra role có permission không (chưa tính scope). */

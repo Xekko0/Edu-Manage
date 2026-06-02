@@ -35,9 +35,6 @@ const homeroom = async (req, res, next) => {
     if (!cls) return error(res, 'Không tìm thấy lớp', 404);
 
     const isHomeroom = Number(cls.homeroom_teacher_id) === Number(req.user.id);
-    // #region agent log
-    fetch('http://127.0.0.1:7598/ingest/50d32c58-c803-483c-84ed-d5e16a0a5512',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c24510'},body:JSON.stringify({sessionId:'c24510',location:'homeroom.middleware.js',message:'homeroom check',data:{class_id,userId:req.user.id,homeroomTeacherId:cls.homeroom_teacher_id,isHomeroom},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     if (!isHomeroom) {
       return error(res, 'Bạn không phải GVCN của lớp này', 403);
     }

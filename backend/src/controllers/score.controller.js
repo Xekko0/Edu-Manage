@@ -85,10 +85,6 @@ const listByClass = async (req, res) => {
 
     const isHomeroom = Number(cls.homeroom_teacher_id) === Number(req.user.id);
 
-    // #region agent log
-    fetch('http://127.0.0.1:7598/ingest/50d32c58-c803-483c-84ed-d5e16a0a5512',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c24510'},body:JSON.stringify({sessionId:'c24510',location:'score.controller.js:listByClass',message:'score class access',data:{class_id,userId:req.user.id,homeroomTeacherId:cls.homeroom_teacher_id,isHomeroom,role:req.user.role},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
-
     // GVCN (role homeroom legacy hoặc subject + chủ nhiệm): xem tất cả môn
     if (req.user.role === 'homeroom' && !isHomeroom) {
       return error(res, 'Bạn không phải GVCN của lớp này', 403);

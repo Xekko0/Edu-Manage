@@ -9,7 +9,8 @@
     "db:migrate": "sequelize-cli db:migrate",
     "db:seed": "sequelize-cli db:seed:all",
     "db:reset": "sequelize-cli db:migrate:undo:all && sequelize-cli db:migrate && sequelize-cli db:seed:all",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "ai:install-cli": "npm install -g @anthropic-ai/claude-code @google/gemini-cli"
   },
   "keywords": [
     "edusmart",
@@ -21,6 +22,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.0",
+    "@google/generative-ai": "^0.21.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

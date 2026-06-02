@@ -32,8 +32,12 @@
     {
       "name": "Chat AI Widget",
       "item": [
-        { "name": "Send Message", "request": { "method": "POST", "url": "{{base}}/chat/message", "body": { "mode": "raw", "raw": "{\"message\":\"Điểm con tôi môn Toán?\"}" } } },
-        { "name": "End Session", "request": { "method": "POST", "url": "{{base}}/chat/end-session" } }
+        { "name": "AI Status", "request": { "method": "GET", "url": "{{base}}/chat/status" } },
+        { "name": "List Sessions", "request": { "method": "GET", "url": "{{base}}/chat/sessions" } },
+        { "name": "Session History", "request": { "method": "GET", "url": "{{base}}/chat/sessions/:token" } },
+        { "name": "Delete Session", "request": { "method": "DELETE", "url": "{{base}}/chat/sessions/:token" } },
+        { "name": "Send Message", "request": { "method": "POST", "url": "{{base}}/chat/message", "body": { "mode": "raw", "raw": "{\"message\":\"Tôi có thể làm gì?\",\"class_id\":1}" } } },
+        { "name": "End Session", "request": { "method": "POST", "url": "{{base}}/chat/end-session", "body": { "mode": "raw", "raw": "{\"session_token\":\"...\"}" } } }
       ]
     }
   ],

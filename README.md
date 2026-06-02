@@ -49,7 +49,8 @@ cd ../frontend && npm install
 # Backend
 cd backend
 cp .env.example .env
-# Mở .env và điền: DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY, SMTP_*
+# Mở .env và điền: DATABASE_URL, JWT_SECRET, (tuỳ chọn) ANTHROPIC_API_KEY hoặc GEMINI_API_KEY, SMTP_*
+# Chi tiết AI: docs/AI_SETUP.md · Module: docs/AI_CHAT_MODULE.md
 
 # Frontend
 cd ../frontend
@@ -174,7 +175,7 @@ User message (~5–20 token)
 | Lập thời khóa biểu | ✅ | — | — | Xem | Xem |
 | Nhập / sửa điểm | Tất cả | Lớp mình* | Môn + lớp được phân công | — | — |
 | Điểm danh | ✅ | Lớp CN | — | Xem con | Xem mình |
-| AI Chatbot Widget | — | — | — | ✅ | ✅ |
+| AI Chatbot Widget | ✅ | ✅ | ✅ | ✅ | ✅ |
 
 (*) GVCN có thể nhập điểm cho lớp chủ nhiệm nếu đồng thời được phân công dạy môn đó.
 

@@ -10,6 +10,10 @@ required.forEach((k) => {
   }
 });
 
+if (!process.env.ANTHROPIC_API_KEY && !process.env.GEMINI_API_KEY) {
+  console.warn('[ENV] Chưa cấu hình AI — chat dùng nhận diện từ khóa (rules). Thêm ANTHROPIC_API_KEY hoặc GEMINI_API_KEY.');
+}
+
 module.exports = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: parseInt(process.env.PORT, 10) || 3001,

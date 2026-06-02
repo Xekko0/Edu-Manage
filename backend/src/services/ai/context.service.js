@@ -1,18 +1,32 @@
 /**
  * Lớp 2 — Context Injection (0 token).
- *  - role=parent  → query parent_student → lấy child_id
- *  - role=student → user.id chính là student_id (qua bảng students)
+ *  - role=parent  → child_id (body student_id hoặc con đầu tiên)
+ *  - role=student → student của user
  */
 const { Student, User } = require('../../models');
 
-const injectContext = async (intentObj, user) => {
+const resolveChildForParent = async (parentUserId, requestedStudentId) => {
+  const parent = await User.findByPk(parentUserId, {
+    include: [{ model: Student, as: 'children' }],
+  });
+  const children = parent?.children || [];
+  if (!children.length) return null;
+
+  if (requestedStudentId) {
+    const match = children.find((c) => c.id === Number(requestedStudentId));
+    return match || children[0];
+  }
+  return children[0];
+};
+
+const injectContext = async (intentObj, user, options = {}) => {
   const ctx = { ...intentObj, child_id: null, class_id: null };
+  const requestedStudentId = options.student_id
+    ? Number(options.student_id)
+    : null;
 
   if (user.role === 'parent') {
-    const parent = await User.findByPk(user.id, {
-      include: [{ model: Student, as: 'children', limit: 1 }],
-    });
-    const child = parent?.children?.[0];
+    const child = await resolveChildForParent(user.id, requestedStudentId);
     if (child) {
       ctx.child_id = child.id;
       ctx.class_id = child.class_id;
