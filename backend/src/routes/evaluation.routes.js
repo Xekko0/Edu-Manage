@@ -8,8 +8,8 @@ const router = express.Router();
 router.use(auth);
 
 router.get('/student/:student_id', parentLink, ctrl.listByStudent);
-router.post('/', role('admin', 'homeroom', 'subject'), ctrl.create);
-router.put('/:id', role('admin', 'homeroom', 'subject'), ctrl.update);
-router.delete('/:id', role('admin', 'homeroom', 'subject'), ctrl.remove);
+router.post('/', role('admin', 'subject'), ctrl.create);
+router.put('/:id', role('admin', 'subject'), ctrl.update);
+router.delete('/:id', role('admin', 'subject'), ctrl.remove);
 
 module.exports = router;

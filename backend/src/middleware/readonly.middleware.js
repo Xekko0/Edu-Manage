@@ -15,6 +15,7 @@ const ALLOWED_WRITE_PREFIXES = [
   '/api/auth/reset-password',
   '/api/chat/message',
   '/api/chat/end-session',
+  '/api/push/subscribe',
 ];
 
 // PATCH thông báo (đánh dấu đã đọc) đặt ngoại lệ riêng:
@@ -46,7 +47,9 @@ const readonlyForStudentParent = (req, res, next) => {
   if (isMarkNotificationRead(req.originalUrl, req.method)) return next();
   if (
     (req.method === 'POST' && req.originalUrl.startsWith('/api/chat')) ||
-    (req.method === 'POST' && req.originalUrl.startsWith('/api/auth'))
+    (req.method === 'POST' && req.originalUrl.startsWith('/api/auth')) ||
+    (req.method === 'POST' && req.originalUrl.startsWith('/api/push/subscribe')) ||
+    (req.method === 'DELETE' && req.originalUrl.startsWith('/api/push/subscribe'))
   ) return next();
 
   return res.status(403).json({

@@ -8,6 +8,8 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
 import Pagination from '../../components/ui/Pagination';
 import usePagination from '../../hooks/usePagination';
 import { listStudents, createStudent, updateStudent, resetStudentPassword, removeStudent } from '../../api/student.api';
@@ -152,37 +154,34 @@ export default function Students() {
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>
       ) : !items.length ? (
-        <EmptyState message="Không có học sinh." />
+        <Card><EmptyState message="Không có học sinh." /></Card>
       ) : (
-        <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm min-w-[720px]">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="px-3 py-2 text-left">Mã HS</th>
-                <th className="px-3 py-2 text-left">Họ tên</th>
-                <th className="px-3 py-2 text-left">Lớp</th>
-                <th className="px-3 py-2 text-left">Email</th>
-                <th className="px-3 py-2 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slice.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">{row.student_code}</td>
-                  <td className="px-3 py-2 font-medium">{row.user?.full_name}</td>
-                  <td className="px-3 py-2">{row.class?.name}</td>
-                  <td className="px-3 py-2 text-slate-600">{row.user?.email}</td>
-                  <td className="px-3 py-2 text-right text-xs space-x-2">
-                    <button type="button" className="text-brand hover:underline" onClick={() => openEdit(row)}>Sửa</button>
-                    <button type="button" className="text-amber-600 hover:underline" onClick={() => handleReset(row)}>Reset MK</button>
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
-        </div>
+        <Card>
+          <CardBody className="!p-0 sm:!p-0">
+            <DataTable
+              columns={[
+                { key: 'code', label: 'Mã HS', render: (r) => <span className="font-mono text-xs">{r.student_code}</span> },
+                { key: 'name', label: 'Họ tên', render: (r) => r.user?.full_name },
+                { key: 'class', label: 'Lớp', render: (r) => r.class?.name },
+                { key: 'email', label: 'Email', render: (r) => <span className="text-slate-600">{r.user?.email}</span> },
+                {
+                  key: 'actions',
+                  label: 'Thao tác',
+                  className: 'text-right',
+                  render: (row) => (
+                    <span className="text-xs space-x-2 inline-flex justify-end w-full">
+                      <button type="button" className="text-primary hover:underline" onClick={() => openEdit(row)}>Sửa</button>
+                      <button type="button" className="text-amber-600 hover:underline" onClick={() => handleReset(row)}>Reset MK</button>
+                      <button type="button" className="text-rose-600 hover:underline" onClick={() => handleDelete(row)}>Xóa</button>
+                    </span>
+                  ),
+                },
+              ]}
+              data={slice}
+            />
+            <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
+          </CardBody>
+        </Card>
       )}
 
       <Modal open={modalOpen} title={editing ? 'Sửa học sinh' : 'Thêm học sinh'} onClose={() => setModalOpen(false)} wide>

@@ -3,7 +3,7 @@
 > Dự án tiểu luận tốt nghiệp — Khoa Công nghệ Thông tin
 > Phạm vi: 1 sinh viên / 3 tháng (12 tuần)
 
-EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người dùng: **Admin / GVCN / GVBM / Phụ huynh / Học sinh**, tích hợp **AI Chatbot Widget** dạng floating bubble (góc phải dưới) cho PH/HS.
+EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người dùng: **Admin / GVCN / GVBM / Phụ huynh / Học sinh**, tích hợp **AI Chatbot Widget** (floating bubble) cho cả 5 persona. GVCN = giáo viên `role=subject` được gán `classes.homeroom_teacher_id` (xem [PERMISSIONS.md](docs/PERMISSIONS.md), [FLOWS.md](docs/FLOWS.md)).
 
 ---
 
@@ -14,7 +14,7 @@ EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người
 - **Phân công GVBM** linh hoạt theo môn × lớp × năm học
 - **Lịch học, điểm danh** + cảnh báo email khi vắng không phép
 - **AI Chatbot Widget**: Floating bubble, popup 320×480, Quick Chips gợi ý, kết quả render ngay trong bubble (bảng điểm + nút Tải PDF inline)
-- **Pipeline AI 4 lớp**: Intent Detection → Context Injection → Function Router → AI Advice
+- **AI module-first**: Rules NLU → Tool dispatcher → DB tools; LLM chỉ `general_chat` / `ai_advice` (xem [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md))
 - **Xuất PDF** học bạ, bảng điểm, báo cáo lớp
 - **Thông báo + email** Nodemailer SMTP
 
@@ -24,7 +24,7 @@ EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người
 
 | Tầng | Công nghệ |
 | --- | --- |
-| Frontend | React 18 + Vite + Tailwind CSS + Zustand + React Router |
+| Frontend | React 18 + Vite + Tailwind (teal/slate design system) + Zustand + React Router + lucide-react |
 | Backend | Node.js + Express + Sequelize ORM |
 | Database | PostgreSQL (Supabase free tier) |
 | AI | Claude Haiku / Gemini Flash (cấu hình qua `.env`) |
@@ -78,11 +78,15 @@ npm run dev   # http://localhost:5173
 ```
 
 ### 6. Đăng nhập tài khoản mẫu
-- Admin:    `admin@edusmart.local` / `admin123`
-- GVCN:     `gvcn@edusmart.local` / `gv123`
-- GVBM:     `gvbm@edusmart.local` / `gv123`
-- Phụ huynh: `ph@edusmart.local` / `ph123`
-- Học sinh:  `hs@edusmart.local` / `hs123`
+Mật khẩu chung sau seed: **`edusmart123`** — chi tiết: [ACCOUNTS.md](docs/ACCOUNTS.md)
+
+| Vai trò | Email |
+| --- | --- |
+| Admin | `admin@edusmart.local` |
+| GVCN 10A1 | `gvcn.10a1@edusmart.local` |
+| GVBM Toán | `gv.toan@edusmart.local` |
+| PH | `ph.10a1.01@edusmart.local` |
+| HS | `hs.10a1.01@edusmart.local` |
 
 ---
 
@@ -116,28 +120,28 @@ edusmart/
 │   │   ├── api/           # axios + auth/score/chat
 │   │   └── store/         # authStore, chatStore (Zustand)
 │   └── index.html
-└── docs/            # SRS, API_Collection.json, ERD.png
+└── docs/            # SRS, FLOWS.md, UI_GUIDE.md, ACCOUNTS.md
 ```
 
 ---
 
-## Mô hình AI Widget (SRS 2.7)
+## Mô hình AI Widget
 
 ```
-User message (~5–20 token)
+User message
         │
         ▼
-┌────────────────┐  Lớp 1 — Intent Detection (~150 token, LLM)
-│ intent.service │   → { intent, subject, semester, week }
+┌────────────────┐  Rules NLU (intent.service / staff-intent)
+│ intent rules   │   → intent + slots (subject, semester, …)
 └────────────────┘
         │
         ▼
-┌────────────────┐  Lớp 2 — Context Injection (0 token)
-│ context.service│   PH → child_id qua parent_student
-└────────────────┘   HS → student_id qua user_id
+┌────────────────┐  Context (capabilities, class_id, student_id)
+│ context inject │
+└────────────────┘
         │
         ▼
-┌────────────────┐  Lớp 3 — Function Router (DB query, 0 token)
+┌────────────────┐  Tool dispatcher (DB, 0 token LLM)
 │ router.service │   switch(intent) gọi đúng module
 └────────────────┘
         │

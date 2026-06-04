@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import useAuth from '../../hooks/useAuth';
 import useStudentContext from '../../hooks/useStudentContext';
 import useTeacherClasses from '../../hooks/useTeacherClasses';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 import PageHeader from '../../components/ui/PageHeader';
 import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
@@ -12,27 +13,31 @@ import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import ScheduleGridTable from '../../components/schedule/ScheduleGridTable';
+import StudentScheduleView from '../../components/schedule/StudentScheduleView';
+import ScheduleSlotDetail from '../../components/schedule/ScheduleSlotDetail';
 import {
   listSchedules,
   listSchedulesMine,
+  listSchedulesMyClass,
   moveSchedule,
   removeSchedule,
   createSchedule,
+  patchScheduleLesson,
 } from '../../api/schedule.api';
+import useWebPush, { getReminderMinutesPref, setReminderMinutesPref } from '../../hooks/useWebPush';
 import { listClasses } from '../../api/class.api';
+import { getTimetableConfig } from '../../api/timetable-config.api';
 import {
-  CURRENT_SCHOOL_YEAR,
   SESSION_LABEL,
-  SESSIONS,
   DAY_OF_WEEK,
-  SCHEDULE_DAYS,
-  SCHEDULE_PERIODS,
   CONFLICT_LABEL,
   TEACHER_MAX_PERIODS_WEEK,
 } from '../../utils/labels';
+import { gridFromTimetableConfig, defaultTimetableConfig } from '../../utils/timetableGrid';
 
 export default function Schedule() {
   const { user } = useAuth();
+  const { schoolYear } = useSchoolYear();
   const { selectedStudent, loading: ctxLoading } = useStudentContext();
   const { homeroomClass, teachingClasses, assignments, loading: tcLoading } = useTeacherClasses();
   const [session, setSession] = useState('morning');
@@ -47,8 +52,23 @@ export default function Schedule() {
   const [roomEdit, setRoomEdit] = useState('');
   const [moveForm, setMoveForm] = useState({ day_of_week: 1, period: 1, session: 'morning' });
   const [saving, setSaving] = useState(false);
+  const [timetableConfig, setTimetableConfig] = useState(defaultTimetableConfig());
+  const [studentSlots, setStudentSlots] = useState([]);
+  const [detailSlot, setDetailSlot] = useState(null);
+  const [lessonForm, setLessonForm] = useState({
+    lesson_topic: '',
+    homework_reminder: '',
+    delivery_mode: 'offline',
+    online_meeting_url: '',
+  });
+  const [reminderMin, setReminderMin] = useState(getReminderMinutesPref());
+
+  const isStudent = user?.role === 'student';
+  const push = useWebPush({ enabled: isStudent });
 
   const isTeacher = user?.role === 'subject';
+  const grid = gridFromTimetableConfig(timetableConfig, session);
+  const sessionOptions = timetableConfig.sessions || ['morning'];
   const isFamily = ['parent', 'student'].includes(user?.role);
 
   const canPickClass = isTeacher && !mineOnly && teachingClasses.length > 0;
@@ -56,8 +76,18 @@ export default function Schedule() {
     || (canPickClass && classId && teachingClasses.some((c) => String(c.id) === String(classId)));
 
   useEffect(() => {
+    getTimetableConfig({ school_year: schoolYear })
+      .then((res) => {
+        const cfg = res?.data || defaultTimetableConfig();
+        setTimetableConfig(cfg);
+        if (!cfg.sessions?.includes(session)) setSession(cfg.sessions?.[0] || 'morning');
+      })
+      .catch(() => {});
+  }, [schoolYear]);
+
+  useEffect(() => {
     if (user?.role === 'admin') {
-      listClasses({ school_year: CURRENT_SCHOOL_YEAR })
+      listClasses({ school_year: schoolYear })
         .then((res) => {
           const list = res?.data || [];
           setAllClasses(list);
@@ -83,19 +113,25 @@ export default function Schedule() {
     setLoading(true);
     try {
       if (isTeacher && mineOnly) {
-        const res = await listSchedulesMine({ school_year: CURRENT_SCHOOL_YEAR });
+        const res = await listSchedulesMine({ school_year: schoolYear });
         if (res?.success) setItems(res.data?.items || []);
       } else if (canViewFullClass && classId) {
-        const res = await listSchedules({ class_id: classId, school_year: CURRENT_SCHOOL_YEAR });
+        const res = await listSchedules({ class_id: classId, school_year: schoolYear });
         if (res?.success) {
           const payload = res.data;
           setItems(payload?.items || payload || []);
         }
-      } else if (isFamily && classId) {
-        const res = await listSchedules({ class_id: classId, school_year: CURRENT_SCHOOL_YEAR });
+      } else if (isFamily) {
+        const res = await listSchedulesMyClass({
+          school_year: schoolYear,
+          ...(user?.role === 'parent' && selectedStudent?.id
+            ? { student_id: selectedStudent.id }
+            : {}),
+        });
         if (res?.success) {
-          const payload = res.data;
-          setItems(payload?.items || payload || []);
+          const slots = res.data?.slots || res.data?.items || [];
+          setStudentSlots(slots);
+          setItems([]);
         }
       } else {
         setItems([]);
@@ -105,7 +141,7 @@ export default function Schedule() {
     } finally {
       setLoading(false);
     }
-  }, [classId, mineOnly, isTeacher, canViewFullClass, isFamily]);
+  }, [classId, mineOnly, isTeacher, canViewFullClass, isFamily, schoolYear, selectedStudent?.id, user?.role]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -142,11 +178,34 @@ export default function Schedule() {
   const openEdit = (slot) => {
     setEditSlot(slot);
     setRoomEdit(slot.room || '');
+    setLessonForm({
+      lesson_topic: slot.lesson_topic || '',
+      homework_reminder: slot.homework_reminder || '',
+      delivery_mode: slot.delivery_mode || 'offline',
+      online_meeting_url: slot.online_meeting_url || '',
+    });
     setMoveForm({
       day_of_week: slot.day_of_week,
       period: slot.period,
       session: slot.session || 'morning',
     });
+  };
+
+  const handleSaveLesson = async () => {
+    if (!editSlot?.id) return;
+    setSaving(true);
+    try {
+      const res = await patchScheduleLesson(editSlot.id, lessonForm);
+      if (res?.success) {
+        toast.success('Đã lưu nội dung tiết');
+        setEditSlot(null);
+        load();
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Lưu nội dung tiết thất bại');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSave = async () => {
@@ -206,7 +265,7 @@ export default function Schedule() {
         day_of_week: day,
         period,
         session,
-        school_year: CURRENT_SCHOOL_YEAR,
+        school_year: schoolYear,
         room: `P${teachingClasses.find((c) => String(c.id) === classId)?.name || ''}`,
       });
       if (res?.success) {
@@ -325,7 +384,7 @@ export default function Schedule() {
           </Select>
         )}
         <div className="flex gap-1">
-          {SESSIONS.map((s) => (
+          {sessionOptions.map((s) => (
             <button
               key={s}
               type="button"
@@ -358,8 +417,54 @@ export default function Schedule() {
         </p>
       )}
 
+      {isFamily && (
+        <section className="mb-4 p-3 border rounded-lg bg-slate-50 text-sm space-y-2">
+          {isStudent && push.supported && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">Nhắc trước giờ học:</span>
+              <select
+                className="border rounded px-2 py-1 text-sm"
+                value={reminderMin}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setReminderMin(v);
+                  setReminderMinutesPref(v);
+                }}
+              >
+                <option value={15}>15 phút</option>
+                <option value={30}>30 phút</option>
+              </select>
+              {!push.subscribed ? (
+                <Button type="button" disabled={push.loading} onClick={push.subscribe}>
+                  Bật thông báo đẩy
+                </Button>
+              ) : (
+                <Button type="button" variant="secondary" disabled={push.loading} onClick={push.unsubscribe}>
+                  Tắt thông báo
+                </Button>
+              )}
+            </div>
+          )}
+          <p className="text-xs text-slate-600">
+            Mỗi tiết hiển thị giáo viên, phòng học và hình thức (trực tiếp / online). Nhấn tiết để xem bài tập và link lớp.
+          </p>
+        </section>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12"><Spinner /></div>
+      ) : isFamily ? (
+        !studentSlots.length ? (
+          <EmptyState message="Chưa có thời khóa biểu cho lớp này." />
+        ) : (
+          <StudentScheduleView
+            slots={studentSlots}
+            timetableConfig={timetableConfig}
+            session={session}
+            onSessionChange={setSession}
+            onSelectSlot={setDetailSlot}
+          />
+        )
       ) : !displayedItems.length ? (
         <EmptyState message={mineOnly ? 'Bạn chưa có tiết dạy trong lựa chọn này.' : 'Chưa có thời khóa biểu cho lựa chọn này.'} />
       ) : (
@@ -373,6 +478,12 @@ export default function Schedule() {
         />
       )}
 
+      <ScheduleSlotDetail
+        slot={detailSlot}
+        open={!!detailSlot}
+        onClose={() => setDetailSlot(null)}
+      />
+
       <Modal open={!!editSlot} title="Sửa tiết của tôi" onClose={() => setEditSlot(null)}>
         {editSlot && (
           <div className="space-y-4">
@@ -380,6 +491,31 @@ export default function Schedule() {
               {editSlot.subject?.name} — {editSlot.class?.name}
             </p>
             <Input label="Phòng" value={roomEdit} onChange={(e) => setRoomEdit(e.target.value)} />
+            <Input
+              label="Chủ đề bài học"
+              value={lessonForm.lesson_topic}
+              onChange={(e) => setLessonForm({ ...lessonForm, lesson_topic: e.target.value })}
+            />
+            <Input
+              label="Nhắc bài tập / chuẩn bị"
+              value={lessonForm.homework_reminder}
+              onChange={(e) => setLessonForm({ ...lessonForm, homework_reminder: e.target.value })}
+            />
+            <Select
+              label="Hình thức học"
+              value={lessonForm.delivery_mode}
+              onChange={(e) => setLessonForm({ ...lessonForm, delivery_mode: e.target.value })}
+            >
+              <option value="offline">Trực tiếp</option>
+              <option value="online">Trực tuyến</option>
+            </Select>
+            {lessonForm.delivery_mode === 'online' && (
+              <Input
+                label="Link Zoom / Teams"
+                value={lessonForm.online_meeting_url}
+                onChange={(e) => setLessonForm({ ...lessonForm, online_meeting_url: e.target.value })}
+              />
+            )}
             <div className="border-t pt-3">
               <p className="text-sm font-medium mb-2">Chuyển sang ô khác</p>
               <div className="grid grid-cols-3 gap-2">
@@ -388,7 +524,7 @@ export default function Schedule() {
                   value={moveForm.day_of_week}
                   onChange={(e) => setMoveForm({ ...moveForm, day_of_week: Number(e.target.value) })}
                 >
-                  {SCHEDULE_DAYS.map((d) => (
+                  {grid.days.map((d) => (
                     <option key={d} value={d}>{DAY_OF_WEEK[d]}</option>
                   ))}
                 </Select>
@@ -397,7 +533,7 @@ export default function Schedule() {
                   value={moveForm.session}
                   onChange={(e) => setMoveForm({ ...moveForm, session: e.target.value })}
                 >
-                  {SESSIONS.map((s) => (
+                  {sessionOptions.map((s) => (
                     <option key={s} value={s}>{SESSION_LABEL[s]}</option>
                   ))}
                 </Select>
@@ -406,7 +542,7 @@ export default function Schedule() {
                   value={moveForm.period}
                   onChange={(e) => setMoveForm({ ...moveForm, period: Number(e.target.value) })}
                 >
-                  {SCHEDULE_PERIODS.map((p) => (
+                  {gridFromTimetableConfig(timetableConfig, moveForm.session).periods.map((p) => (
                     <option key={p} value={p}>Tiết {p}</option>
                   ))}
                 </Select>
@@ -421,8 +557,11 @@ export default function Schedule() {
               </Button>
               <div className="flex gap-2">
                 <Button type="button" variant="secondary" onClick={() => setEditSlot(null)}>Hủy</Button>
+                <Button type="button" variant="secondary" onClick={handleSaveLesson} disabled={saving}>
+                  Lưu nội dung
+                </Button>
                 <Button type="button" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Đang lưu…' : 'Lưu thay đổi'}
+                  {saving ? 'Đang lưu…' : 'Lưu vị trí'}
                 </Button>
               </div>
             </div>

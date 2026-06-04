@@ -32,11 +32,23 @@ export const SCHEDULE_PERIODS = [1, 2, 3, 4, 5];
 export const SESSION_LABEL = { morning: 'Ca sáng', afternoon: 'Ca chiều' };
 export const SESSIONS = ['morning', 'afternoon'];
 
+export const MAX_PERIODS_PER_SESSION = 5;
+
 export const CONFLICT_LABEL = {
   class: 'Trùng ô lớp',
   teacher: 'Trùng lịch GV',
   room: 'Trùng phòng',
   weekly_limit: 'Vượt giới hạn tiết/tuần',
+  curriculum: 'Lệch khung CT khối',
+  session_cap: 'Vượt 5 tiết/buổi',
+};
+
+export const ROOM_TYPE_LABEL = {
+  classroom: 'Lớp học',
+  lab: 'Phòng Lab',
+  computer: 'Tin học',
+  gym: 'Thể dục',
+  special: 'Đặc biệt',
 };
 
 export const CURRENT_SCHOOL_YEAR = '2024-2025';

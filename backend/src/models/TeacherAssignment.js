@@ -13,6 +13,7 @@ const TeacherAssignment = sequelize.define('TeacherAssignment', {
   class_id: { type: DataTypes.INTEGER, allowNull: false },
   subject_id: { type: DataTypes.INTEGER, allowNull: false },
   school_year: { type: DataTypes.STRING(9), allowNull: false },
+  periods_per_week: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 2 },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
 }, {
   tableName: 'teacher_assignments',

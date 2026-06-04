@@ -9,7 +9,7 @@
 
 ## 2) Giáo viên chủ nhiệm (GVCN)
 
-> Lưu ý: hệ thống hiện tại dùng **1 role giáo viên** là `subject` (GVBM). Trạng thái “GVCN” được xác định bởi việc giáo viên đó được gán vào `classes.homeroom_teacher_id`.
+> Lưu ý: hệ thống dùng **1 role** `subject`. GVCN = `classes.homeroom_teacher_id`. Sau đăng nhập, `GET /auth/me` trả `capabilities` (`is_homeroom`, `homeroom_class`, `assignments`, `persona: gvcn|gvbm`).
 
 - **Email**: gvcn.10a1@edusmart.local
 - **Mật khẩu**: edusmart123

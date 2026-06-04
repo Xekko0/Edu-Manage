@@ -138,9 +138,24 @@ const changePassword = async (req, res) => {
   }
 };
 
+const { resolveCapabilities } = require('../services/access/teacher-capabilities.service');
+
 const me = async (req, res) => {
-  const user = await User.findByPk(req.user.id, { attributes: { exclude: ['password'] } });
-  return success(res, user);
+  try {
+    const user = await User.findByPk(req.user.id, { attributes: { exclude: ['password'] } });
+    if (!user) return error(res, 'Không tìm thấy người dùng', 404);
+
+    const payload = user.toJSON();
+    payload.school_year = env.CURRENT_SCHOOL_YEAR;
+
+    if (['admin', 'subject', 'homeroom'].includes(user.role)) {
+      payload.capabilities = await resolveCapabilities(user);
+    }
+
+    return success(res, payload);
+  } catch (err) {
+    return error(res, 'Lỗi tải hồ sơ', 500, err.message);
+  }
 };
 
 module.exports = { login, refresh, forgotPassword, resetPassword, changePassword, me };

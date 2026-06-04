@@ -1,69 +1,60 @@
 /** S05 — Dashboard PH/HS. */
-import { Link } from 'react-router-dom';
-import useStudentContext from '../../hooks/useStudentContext';
 import PageHeader from '../../components/ui/PageHeader';
 import StatCard from '../../components/ui/StatCard';
-import StudentSelector from '../../components/family/StudentSelector';
 import Spinner from '../../components/ui/Spinner';
+import ShortcutGrid from '../../components/admin/ShortcutGrid';
+import useStudentContext from '../../hooks/useStudentContext';
+import Card, { CardBody } from '../../components/ui/Card';
+import { Sparkles } from 'lucide-react';
 
 export default function FamilyDashboard() {
-  const {
-    loading, selectedStudent, students, selectedId, setSelectedId, isParent,
-  } = useStudentContext();
+  const { loading, selectedStudent } = useStudentContext();
 
   if (loading) {
     return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
   }
 
-  const cards = [
-    { to: '/family/scores', label: 'Bảng điểm', desc: 'Xem điểm các môn theo kỳ', color: 'blue' },
-    { to: '/family/gradebook', label: 'Học bạ điện tử', desc: 'Xếp loại, xuất PDF', color: 'green' },
-    { to: '/family/evaluations', label: 'Đánh giá', desc: 'Nhận xét từ GVCN, GVBM', color: 'purple' },
-    { to: '/family/tuition', label: 'Học phí', desc: 'Trạng thái đóng học phí', color: 'amber' },
-    { to: '/schedule', label: 'Lịch học', desc: 'Thời khóa biểu lớp', color: 'slate' },
-    { to: '/extracurricular', label: 'Ngoại khóa', desc: 'Hoạt động đã đăng ký', color: 'slate' },
+  const shortcuts = [
+    { to: '/family/scores', label: 'Bảng điểm', desc: 'Điểm các môn theo kỳ', icon: 'GraduationCap' },
+    { to: '/family/gradebook', label: 'Học bạ điện tử', desc: 'Xếp loại, xuất PDF', icon: 'School' },
+    { to: '/family/evaluations', label: 'Đánh giá', desc: 'Nhận xét GVCN, GVBM', icon: 'MessageSquare' },
+    { to: '/family/tuition', label: 'Học phí', desc: 'Trạng thái đóng phí', icon: 'Wallet' },
+    { to: '/schedule', label: 'Lịch học', desc: 'Thời khóa biểu lớp', icon: 'CalendarDays' },
+    { to: '/extracurricular', label: 'Ngoại khóa', desc: 'Hoạt động đã đăng ký', icon: 'Sparkles' },
   ];
 
   return (
     <div>
-      <PageHeader title="Tổng quan" />
+      <PageHeader
+        title="Tổng quan"
+        description={selectedStudent
+          ? `Xin chào — ${selectedStudent.user?.full_name || selectedStudent.student_code}`
+          : 'Chọn học sinh để xem dữ liệu'}
+      />
 
       {selectedStudent && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <StatCard label="Mã HS" value={selectedStudent.student_code} color="teal" />
+          <StatCard label="Lớp" value={selectedStudent.class?.name} color="green" />
           <StatCard
             label="Học sinh"
             value={selectedStudent.user?.full_name?.split(' ').slice(-2).join(' ') || '—'}
             color="blue"
           />
-          <StatCard label="Mã HS" value={selectedStudent.student_code} color="slate" />
-          <StatCard label="Lớp" value={selectedStudent.class?.name} color="green" />
-          <div className="md:col-span-1">
-            <StudentSelector
-              students={students}
-              selectedId={selectedId}
-              setSelectedId={setSelectedId}
-              isParent={isParent}
-            />
-          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {cards.map((c) => (
-          <Link
-            key={c.to}
-            to={c.to}
-            className="bg-white p-5 rounded-xl border hover:border-brand hover:shadow-sm transition"
-          >
-            <div className="font-semibold">{c.label}</div>
-            <div className="text-sm text-slate-500 mt-1">{c.desc}</div>
-          </Link>
-        ))}
-      </div>
+      <h2 className="text-h2 mb-4">Chức năng</h2>
+      <ShortcutGrid items={shortcuts} />
 
-      <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900">
-        Trợ lý AI EduSmart ở góc phải dưới — hỏi nhanh về điểm, lịch học, điểm danh.
-      </div>
+      <Card className="mt-8 border-teal-100 bg-teal-50/40">
+        <CardBody className="flex gap-3 items-start">
+          <Sparkles className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden />
+          <p className="text-sm text-teal-900">
+            Trợ lý AI EduSmart ở góc phải dưới — hỏi nhanh về điểm, lịch học và học phí.
+          </p>
+        </CardBody>
+      </Card>
     </div>
   );
 }

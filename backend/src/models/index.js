@@ -20,6 +20,10 @@ const Tuition = require('./Tuition');
 const TuitionPayment = require('./TuitionPayment');
 const ClassJournal = require('./ClassJournal');
 const Evaluation = require('./Evaluation');
+const TimetableConfig = require('./TimetableConfig');
+const Room = require('./Room');
+const CurriculumStandard = require('./CurriculumStandard');
+const PushSubscription = require('./PushSubscription');
 
 // User ↔ Student (1-1)
 User.hasOne(Student, { foreignKey: 'user_id', as: 'studentProfile' });
@@ -64,6 +68,10 @@ Student.hasMany(Score, { foreignKey: 'student_id', as: 'scores' });
 Schedule.belongsTo(Class, { foreignKey: 'class_id', as: 'class' });
 Schedule.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
 Schedule.belongsTo(User, { foreignKey: 'teacher_id', as: 'teacher' });
+Schedule.belongsTo(Room, { foreignKey: 'room_id', as: 'roomRef' });
+
+PushSubscription.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasMany(PushSubscription, { foreignKey: 'user_id', as: 'pushSubscriptions' });
 
 // Attendance
 Attendance.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
@@ -112,6 +120,9 @@ Evaluation.belongsTo(User, { foreignKey: 'teacher_id', as: 'teacher' });
 Evaluation.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
 Student.hasMany(Evaluation, { foreignKey: 'student_id', as: 'evaluations' });
 
+CurriculumStandard.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
+Subject.hasMany(CurriculumStandard, { foreignKey: 'subject_id', as: 'curriculumStandards' });
+
 module.exports = {
   sequelize,
   User,
@@ -130,4 +141,8 @@ module.exports = {
   TuitionPayment,
   ClassJournal,
   Evaluation,
+  TimetableConfig,
+  Room,
+  CurriculumStandard,
+  PushSubscription,
 };

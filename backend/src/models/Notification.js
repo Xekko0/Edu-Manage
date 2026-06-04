@@ -10,7 +10,7 @@ const Notification = sequelize.define('Notification', {
   title: { type: DataTypes.STRING(200), allowNull: false },
   body: { type: DataTypes.TEXT, allowNull: false },
   type: {
-    type: DataTypes.ENUM('system', 'score', 'attendance', 'event', 'message'),
+    type: DataTypes.STRING(20),
     defaultValue: 'system',
   },
   is_read: { type: DataTypes.BOOLEAN, defaultValue: false },

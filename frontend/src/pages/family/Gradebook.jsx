@@ -11,9 +11,10 @@ import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import { getStudentScores, downloadGradebookPDF } from '../../api/score.api';
 import { downloadBlob } from '../../utils/format';
-import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
 export default function Gradebook() {
+  const { schoolYear } = useSchoolYear();
   const {
     loading: ctxLoading, error: ctxError, selectedId, selectedStudent,
     students, setSelectedId, isParent,
@@ -33,7 +34,7 @@ export default function Gradebook() {
       try {
         const res = await getStudentScores(selectedId, {
           semester,
-          school_year: CURRENT_SCHOOL_YEAR,
+          school_year: schoolYear,
         });
         if (!cancelled && res?.success) {
           setItems(res.data.items || []);
@@ -55,7 +56,7 @@ export default function Gradebook() {
     try {
       const blob = await downloadGradebookPDF(selectedId, {
         semester,
-        school_year: CURRENT_SCHOOL_YEAR,
+        school_year: schoolYear,
       });
       const code = selectedStudent?.student_code || selectedId;
       downloadBlob(blob, `hocba_${code}.pdf`);
@@ -103,7 +104,7 @@ export default function Gradebook() {
           <div><span className="text-slate-500">Học sinh:</span> {selectedStudent?.user?.full_name || '—'}</div>
           <div><span className="text-slate-500">Mã HS:</span> {selectedStudent?.student_code || '—'}</div>
           <div><span className="text-slate-500">Lớp:</span> {selectedStudent?.class?.name || '—'}</div>
-          <div><span className="text-slate-500">Năm học:</span> {CURRENT_SCHOOL_YEAR}</div>
+          <div><span className="text-slate-500">Năm học:</span> {schoolYear}</div>
         </div>
         {overall != null && (
           <p className="mt-3 text-sm">

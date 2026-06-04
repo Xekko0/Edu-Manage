@@ -9,11 +9,13 @@ import StudentSelector from '../../components/family/StudentSelector';
 import useStudentContext from '../../hooks/useStudentContext';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody } from '../../components/ui/Card';
 import { getStudentScores, downloadGradebookPDF } from '../../api/score.api';
 import { downloadBlob } from '../../utils/format';
-import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
 export default function Scores() {
+  const { schoolYear } = useSchoolYear();
   const {
     loading: ctxLoading, error: ctxError, selectedId, selectedStudent,
     students, setSelectedId, isParent,
@@ -33,7 +35,7 @@ export default function Scores() {
       try {
         const res = await getStudentScores(selectedId, {
           semester,
-          school_year: CURRENT_SCHOOL_YEAR,
+          school_year: schoolYear,
         });
         if (!cancelled && res?.success) {
           setItems(res.data.items || []);
@@ -55,7 +57,7 @@ export default function Scores() {
     try {
       const blob = await downloadGradebookPDF(selectedId, {
         semester,
-        school_year: CURRENT_SCHOOL_YEAR,
+        school_year: schoolYear,
       });
       const code = selectedStudent?.student_code || selectedId;
       downloadBlob(blob, `bangdiem_${code}.pdf`);
@@ -85,30 +87,36 @@ export default function Scores() {
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        <StudentSelector
-          students={students}
-          selectedId={selectedId}
-          setSelectedId={setSelectedId}
-          isParent={isParent}
-        />
-        <Select label="Học kỳ" value={semester} onChange={(e) => setSemester(e.target.value)}>
-          <option value="1">Học kỳ 1</option>
-          <option value="2">Học kỳ 2</option>
-        </Select>
-        {overall != null && (
-          <div className="bg-white rounded-lg border p-4 text-sm">
-            <span className="text-slate-500">TB chung:</span>{' '}
-            <b className="text-lg">{Number(overall).toFixed(2)}</b>
-          </div>
-        )}
-      </div>
+      <Card className="mb-4">
+        <CardBody className="grid grid-cols-1 md:grid-cols-3 gap-4 !py-4">
+          <StudentSelector
+            students={students}
+            selectedId={selectedId}
+            setSelectedId={setSelectedId}
+            isParent={isParent}
+          />
+          <Select label="Học kỳ" value={semester} onChange={(e) => setSemester(e.target.value)}>
+            <option value="1">Học kỳ 1</option>
+            <option value="2">Học kỳ 2</option>
+          </Select>
+          {overall != null && (
+            <div className="flex items-center gap-2 text-sm p-3 rounded-lg bg-teal-50 border border-teal-100">
+              <span className="text-slate-600">TB chung:</span>
+              <b className="text-xl text-teal-800">{Number(overall).toFixed(2)}</b>
+            </div>
+          )}
+        </CardBody>
+      </Card>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : (
-        <ScoreTable items={items} />
-      )}
+      <Card>
+        <CardBody>
+          {loading ? (
+            <div className="flex justify-center py-12"><Spinner /></div>
+          ) : (
+            <ScoreTable items={items} />
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }

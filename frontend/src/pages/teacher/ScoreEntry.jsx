@@ -7,11 +7,15 @@ import Button from '../../components/ui/Button';
 import Select from '../../components/ui/Select';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
 import { listStudents } from '../../api/student.api';
 import { enterScoresBulk } from '../../api/score.api';
-import { SCORE_TYPE_LABEL, CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { SCORE_TYPE_LABEL } from '../../utils/labels';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
 export default function ScoreEntry() {
+  const { schoolYear } = useSchoolYear();
   const { loading: clsLoading, assignments } = useTeacherClasses();
   const [classId, setClassId] = useState('');
   const [subjectId, setSubjectId] = useState('');
@@ -22,7 +26,12 @@ export default function ScoreEntry() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const classOptions = [...new Map(assignments.map((a) => [a.class_id, a.class])).values()];
+  const classOptions = [...new Map(
+    assignments.map((a) => [
+      a.class_id,
+      a.class || { id: a.class_id, name: a.class_name },
+    ]),
+  ).values()].filter((c) => c?.id);
 
   useEffect(() => {
     if (classOptions.length && !classId) {
@@ -66,7 +75,7 @@ export default function ScoreEntry() {
         score_type: scoreType,
         score_value: Number(scores[s.id]),
         semester: Number(semester),
-        school_year: CURRENT_SCHOOL_YEAR,
+        school_year: schoolYear,
       }));
 
     if (!items.length) return toast.error('Nhập ít nhất một điểm');
@@ -90,7 +99,10 @@ export default function ScoreEntry() {
     return (
       <div>
         <PageHeader title="Nhập điểm" />
-        <EmptyState message="Bạn chưa được phân công dạy môn nào." />
+        <EmptyState
+          title="Chưa có phân công môn"
+          description="Admin cần gán bạn dạy môn × lớp (teacher_assignments) trước khi nhập điểm. GVCN chỉ xem điểm cả lớp nếu chưa được phân công dạy môn."
+        />
       </div>
     );
   }
@@ -101,13 +113,16 @@ export default function ScoreEntry() {
         <Button onClick={handleSave} disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu điểm'}</Button>
       </PageHeader>
 
-      <div className="bg-white p-4 rounded-lg border mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      <Card className="mb-4">
+      <CardBody className="grid grid-cols-1 md:grid-cols-4 gap-3 !py-4">
         <Select label="Lớp" value={classId} onChange={(e) => setClassId(e.target.value)}>
           {classOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
         <Select label="Môn" value={subjectId} onChange={(e) => setSubjectId(e.target.value)}>
           {subjectOptions.map((a) => (
-            <option key={a.id} value={a.subject_id}>{a.subject?.name}</option>
+            <option key={a.id || `${a.class_id}-${a.subject_id}`} value={a.subject_id}>
+              {a.subject?.name || a.subject_name}
+            </option>
           ))}
         </Select>
         <Select label="Loại điểm" value={scoreType} onChange={(e) => setScoreType(e.target.value)}>
@@ -119,42 +134,42 @@ export default function ScoreEntry() {
           <option value="1">HK 1</option>
           <option value="2">HK 2</option>
         </Select>
-      </div>
+      </CardBody>
+      </Card>
 
+      <Card>
       {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
+        <CardBody><div className="flex justify-center py-12"><Spinner /></div></CardBody>
       ) : (
-        <div className="bg-white rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="px-3 py-2 text-left">Mã HS</th>
-                <th className="px-3 py-2 text-left">Họ tên</th>
-                <th className="px-3 py-2 text-center w-28">Điểm (0–10)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {students.map((s) => (
-                <tr key={s.id} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">{s.student_code}</td>
-                  <td className="px-3 py-2">{s.user?.full_name}</td>
-                  <td className="px-3 py-2">
-                    <input
-                      type="number"
-                      min="0"
-                      max="10"
-                      step="0.25"
-                      className="w-full px-2 py-1 border rounded text-center"
-                      value={scores[s.id] ?? ''}
-                      onChange={(e) => setScores({ ...scores, [s.id]: e.target.value })}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <CardBody className="!p-0 sm:!p-0">
+          <DataTable
+            columns={[
+              { key: 'code', label: 'Mã HS', render: (s) => <span className="font-mono text-xs">{s.student_code}</span> },
+              { key: 'name', label: 'Họ tên', render: (s) => s.user?.full_name },
+              {
+                key: 'score',
+                label: 'Điểm (0–10)',
+                className: 'text-center w-32',
+                render: (s) => (
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.25"
+                    className="w-full max-w-[88px] mx-auto px-2 py-1.5 border border-slate-300 rounded-lg text-center text-sm focus-ring"
+                    value={scores[s.id] ?? ''}
+                    onChange={(e) => setScores({ ...scores, [s.id]: e.target.value })}
+                    aria-label={`Điểm ${s.user?.full_name}`}
+                  />
+                ),
+              },
+            ]}
+            data={students}
+            emptyMessage="Không có học sinh trong lớp."
+          />
+        </CardBody>
       )}
+      </Card>
     </div>
   );
 }

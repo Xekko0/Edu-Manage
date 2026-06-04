@@ -2,7 +2,15 @@ import useAuthStore from '../store/authStore';
 import * as authApi from '../api/auth.api';
 
 const useAuth = () => {
-  const { user, accessToken, setAuth, logout } = useAuthStore();
+  const { user, accessToken, setAuth, patchUser, logout } = useAuthStore();
+
+  const refreshProfile = async () => {
+    const meRes = await authApi.me();
+    if (meRes?.success) {
+      patchUser(meRes.data);
+    }
+    return meRes;
+  };
 
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
@@ -12,11 +20,22 @@ const useAuth = () => {
         accessToken: res.data.accessToken,
         refreshToken: res.data.refreshToken,
       });
+      const meRes = await authApi.me();
+      if (meRes?.success) {
+        patchUser(meRes.data);
+      }
     }
     return res;
   };
 
-  return { user, accessToken, isAuthed: !!accessToken, login, logout };
+  return {
+    user,
+    accessToken,
+    isAuthed: !!accessToken,
+    login,
+    logout,
+    refreshProfile,
+  };
 };
 
 export default useAuth;

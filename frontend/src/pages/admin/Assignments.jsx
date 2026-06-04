@@ -5,15 +5,19 @@ import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Select from '../../components/ui/Select';
+import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import { listAssignments, createAssignment, removeAssignment } from '../../api/assignment.api';
 import { listUsers } from '../../api/user.api';
 import { listClasses } from '../../api/class.api';
 import { listSubjects } from '../../api/subject.api';
+import { lookupCurriculum } from '../../api/curriculum.api';
 import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
 
-const emptyForm = { teacher_id: '', class_id: '', subject_id: '', school_year: CURRENT_SCHOOL_YEAR };
+const emptyForm = {
+  teacher_id: '', class_id: '', subject_id: '', school_year: CURRENT_SCHOOL_YEAR, periods_per_week: '2',
+};
 
 export default function Assignments() {
   const [items, setItems] = useState([]);
@@ -24,6 +28,7 @@ export default function Assignments() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [curriculumHint, setCurriculumHint] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,6 +54,26 @@ export default function Assignments() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    const cls = classes.find((c) => String(c.id) === String(form.class_id));
+    if (!cls?.grade_level || !form.subject_id) {
+      setCurriculumHint(null);
+      return;
+    }
+    lookupCurriculum({
+      school_year: CURRENT_SCHOOL_YEAR,
+      grade_level: cls.grade_level,
+    })
+      .then((res) => {
+        const row = (res?.data || []).find((r) => String(r.subject_id) === String(form.subject_id));
+        if (row) {
+          setCurriculumHint(row.periods_per_week);
+          setForm((f) => ({ ...f, periods_per_week: String(row.periods_per_week) }));
+        } else setCurriculumHint(null);
+      })
+      .catch(() => setCurriculumHint(null));
+  }, [form.class_id, form.subject_id, classes]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.teacher_id || !form.class_id || !form.subject_id) {
@@ -61,6 +86,7 @@ export default function Assignments() {
         class_id: Number(form.class_id),
         subject_id: Number(form.subject_id),
         school_year: form.school_year,
+        periods_per_week: Number(form.periods_per_week),
       });
       if (res?.success) {
         toast.success('Phân công thành công');
@@ -108,6 +134,7 @@ export default function Assignments() {
                 <th className="px-3 py-2 text-left">Lớp</th>
                 <th className="px-3 py-2 text-left">Môn</th>
                 <th className="px-3 py-2 text-left">Năm học</th>
+                <th className="px-3 py-2 text-center">Tiết/tuần</th>
                 <th className="px-3 py-2 text-right">Thao tác</th>
               </tr>
             </thead>
@@ -118,6 +145,7 @@ export default function Assignments() {
                   <td className="px-3 py-2 font-medium">{row.class?.name}</td>
                   <td className="px-3 py-2">{row.subject?.name}</td>
                   <td className="px-3 py-2">{row.school_year}</td>
+                  <td className="px-3 py-2 text-center font-medium">{row.periods_per_week ?? 2}</td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Hủy</button>
                   </td>
@@ -142,6 +170,18 @@ export default function Assignments() {
             <option value="">— Chọn môn —</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
+          <Input
+            label="Số tiết/tuần"
+            type="number"
+            min={1}
+            max={10}
+            value={form.periods_per_week}
+            onChange={(e) => setForm({ ...form, periods_per_week: e.target.value })}
+            helper={curriculumHint != null
+              ? `Chuẩn khối: ${curriculumHint} tiết/tuần (bắt buộc khớp)`
+              : 'Dùng khi tự động xếp TKB'}
+            required
+          />
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Hủy</Button>
             <Button type="submit" disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu'}</Button>

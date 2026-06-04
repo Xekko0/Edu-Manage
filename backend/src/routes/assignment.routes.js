@@ -9,6 +9,7 @@ router.use(auth);
 
 router.get('/', role('admin'), ctrl.list);
 router.post('/', role('admin'), ctrl.create);
+router.post('/sync-curriculum', role('admin'), ctrl.syncCurriculum);
 router.delete('/:id', role('admin'), ctrl.remove);
 router.get('/me', role('subject'), ctrl.myAssignments);
 

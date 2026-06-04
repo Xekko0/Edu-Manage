@@ -86,7 +86,7 @@ export default function ChatPopup() {
 
   return (
     <div className="chat-popup">
-      <div className="bg-brand text-white px-4 py-3 flex items-center justify-between">
+      <div className="bg-primary text-white px-4 py-3 flex items-center justify-between">
         <div>
           <div className="font-semibold text-sm">{config.title}</div>
           <div className="text-xs opacity-80">{subtitle}</div>
@@ -149,13 +149,13 @@ export default function ChatPopup() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
           placeholder={config.placeholder}
-          className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand"
+          className="flex-1 px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
         />
         <button
           type="button"
           onClick={() => handleSend()}
           disabled={loading}
-          className="px-3 py-2 text-sm bg-brand text-white rounded-md disabled:opacity-50"
+          className="px-3 py-2 text-sm bg-primary text-white rounded-lg disabled:opacity-50 min-h-[40px]"
         >
           Gửi
         </button>

@@ -1,5 +1,6 @@
-/** Lưới TKB dùng chung (xem / admin). Hỗ trợ nhiều môn trong một ô. */
-import { DAY_OF_WEEK, SCHEDULE_DAYS, SCHEDULE_PERIODS, CONFLICT_LABEL } from '../../utils/labels';
+/** Lưới TKB dùng chung (xem / admin). */
+import { DAY_OF_WEEK, CONFLICT_LABEL } from '../../utils/labels';
+import { fallbackGrid } from '../../utils/timetableGrid';
 
 const cellConflictClass = (slots) =>
   slots.some((s) => s?.conflictTypes?.length > 0)
@@ -12,11 +13,16 @@ const conflictLabels = (types) =>
 export default function ScheduleGridTable({
   items = [],
   session = 'morning',
+  scheduleDays,
+  schedulePeriods,
   renderCell,
   showTeacher = true,
   mineOnly = false,
   userId,
 }) {
+  const fb = fallbackGrid();
+  const days = scheduleDays?.length ? scheduleDays : fb.days;
+  const periods = schedulePeriods?.length ? schedulePeriods : fb.periods;
   const findSlots = (day, period) =>
     items.filter(
       (s) => s.day_of_week === day && s.period === period && (s.session || 'morning') === session,
@@ -57,16 +63,16 @@ export default function ScheduleGridTable({
         <thead className="bg-slate-100">
           <tr>
             <th className="px-3 py-2 text-left w-16">Tiết</th>
-            {SCHEDULE_DAYS.map((d) => (
+            {days.map((d) => (
               <th key={d} className="px-3 py-2 text-center">{DAY_OF_WEEK[d]}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {SCHEDULE_PERIODS.map((p) => (
+          {periods.map((p) => (
             <tr key={p} className="border-t">
               <td className="px-3 py-3 font-medium align-top">Tiết {p}</td>
-              {SCHEDULE_DAYS.map((d) => {
+              {days.map((d) => {
                 const slots = findSlots(d, p);
                 const cellContent = renderCell
                   ? renderCell({ day: d, period: p, session, slots })

@@ -1,8 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Floating Chat Widget — vị trí cố định góc phải dưới */
+@layer base {
+  :root {
+    --color-primary: 13 148 136;
+    --color-surface: 248 250 252;
+    --radius-card: 0.75rem;
+  }
+
+  body {
+    @apply font-sans text-slate-800 antialiased bg-surface;
+  }
+}
+
+@layer components {
+  .text-display {
+    @apply text-3xl font-bold tracking-tight text-slate-900;
+  }
+  .text-h1 {
+    @apply text-2xl font-bold text-slate-900;
+  }
+  .text-h2 {
+    @apply text-lg font-semibold text-slate-800;
+  }
+  .text-body {
+    @apply text-sm text-slate-700;
+  }
+  .text-caption {
+    @apply text-xs text-slate-500;
+  }
+  .focus-ring {
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+  }
+}
+
+/* Chat widget — teal design system */
 .chat-fab {
   position: fixed;
   bottom: 24px;
@@ -10,12 +45,12 @@
   width: 52px;
   height: 52px;
   border-radius: 9999px;
-  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 16px rgba(13, 148, 136, 0.35);
   cursor: pointer;
   z-index: 9999;
   transition: transform 0.2s;
@@ -30,11 +65,12 @@
   height: 480px;
   background: white;
   border-radius: 16px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   z-index: 9998;
+  border: 1px solid #e2e8f0;
   animation: slide-up 0.25s ease-out;
 }
 
@@ -49,7 +85,7 @@
   right: 4px;
   width: 10px;
   height: 10px;
-  background: #ef4444;
+  background: #f43f5e;
   border-radius: 9999px;
   border: 2px solid white;
 }

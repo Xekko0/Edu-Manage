@@ -17,9 +17,20 @@ const Schedule = sequelize.define('Schedule', {
   },
   period: { type: DataTypes.INTEGER, allowNull: false }, // 1..5 per session
   room: { type: DataTypes.STRING(50) },
+  room_id: { type: DataTypes.INTEGER, allowNull: true },
+  delivery_mode: {
+    type: DataTypes.STRING(10),
+    allowNull: false,
+    defaultValue: 'offline',
+  },
+  online_meeting_url: { type: DataTypes.TEXT, allowNull: true },
+  lesson_topic: { type: DataTypes.STRING(200), allowNull: true },
+  homework_reminder: { type: DataTypes.TEXT, allowNull: true },
   school_year: { type: DataTypes.STRING(9), allowNull: false },
 }, {
   tableName: 'schedules',
+  /** TKB dùng unique index ô lớp/GV — không soft-delete (tránh “ô trống” nhưng không thêm được). */
+  paranoid: false,
 });
 
 module.exports = Schedule;

@@ -11,6 +11,7 @@ const morgan = require('morgan');
 
 const env = require('./src/config/env');
 const sequelize = require('./src/config/database');
+const { TimetableConfig } = require('./src/models');
 const rateLimitMiddleware = require('./src/middleware/rateLimit.middleware');
 const readonlyMiddleware = require('./src/middleware/readonly.middleware');
 
@@ -20,6 +21,11 @@ const studentRoutes = require('./src/routes/student.routes');
 const scoreRoutes = require('./src/routes/score.routes');
 const assignmentRoutes = require('./src/routes/assignment.routes');
 const scheduleRoutes = require('./src/routes/schedule.routes');
+const timetableConfigRoutes = require('./src/routes/timetable-config.routes');
+const curriculumRoutes = require('./src/routes/curriculum.routes');
+const roomRoutes = require('./src/routes/room.routes');
+const pushRoutes = require('./src/routes/push.routes');
+const { startScheduleReminderCron } = require('./jobs/schedule-reminder.job');
 const attendanceRoutes = require('./src/routes/attendance.routes');
 const reportRoutes = require('./src/routes/report.routes');
 const notificationRoutes = require('./src/routes/notification.routes');
@@ -74,9 +80,13 @@ app.use('/api/students', studentRoutes);
 app.use('/api/scores', scoreRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/schedules', scheduleRoutes);
+app.use('/api/timetable-config', timetableConfigRoutes);
+app.use('/api/curriculum-standards', curriculumRoutes);
+app.use('/api/rooms', roomRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/push', pushRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/classes', classRoutes);
@@ -99,8 +109,12 @@ const PORT = env.PORT || 3001;
 (async () => {
   try {
     await sequelize.authenticate();
+    await TimetableConfig.sync();
+    const scheduleService = require('./src/services/schedule.service');
+    await scheduleService.purgeGhostSchedules();
     const dialect = sequelize.getDialect();
     console.log(`[DB] Kết nối ${dialect.toUpperCase()} thành công`);
+    startScheduleReminderCron();
     app.listen(PORT, () => console.log(`[APP] EduSmart backend chạy trên cổng ${PORT}`));
   } catch (err) {
     console.error('[DB] Không kết nối được database:', err.message);

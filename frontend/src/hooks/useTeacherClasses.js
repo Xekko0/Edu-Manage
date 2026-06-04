@@ -3,7 +3,7 @@ import useAuth from './useAuth';
 import { listClasses } from '../api/class.api';
 import { myAssignments } from '../api/assignment.api';
 
-/** Lớp chủ nhiệm (GVCN) hoặc lớp được phân công (GVBM). */
+/** Lớp chủ nhiệm (GVCN) hoặc lớp được phân công (GVBM) — ưu tiên `/auth/me` capabilities. */
 export default function useTeacherClasses() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -12,7 +12,23 @@ export default function useTeacherClasses() {
   const [assignments, setAssignments] = useState([]);
 
   useEffect(() => {
-    if (!user || !['admin', 'subject'].includes(user.role)) {
+    if (!user || !['admin', 'subject', 'homeroom'].includes(user.role)) {
+      setLoading(false);
+      return undefined;
+    }
+
+    const caps = user.capabilities;
+    if (caps) {
+      setHomeroomClass(caps.homeroom_class || null);
+      setAssignments(caps.assignments || []);
+      const accessible = caps.accessible_classes || [];
+      const assignClassIds = new Set((caps.assignments || []).map((a) => a.class_id));
+      setAssignedClasses(
+        accessible.filter((c) => assignClassIds.has(c.id) && c.id !== caps.homeroom_class_id),
+      );
+      if (user.role === 'admin') {
+        setAssignedClasses([]);
+      }
       setLoading(false);
       return undefined;
     }
@@ -32,8 +48,7 @@ export default function useTeacherClasses() {
         const mine = assignRes?.data || [];
         setAssignments(mine);
 
-        // Giáo viên (role=subject) có thể được gán làm GVCN qua classes.homeroom_teacher_id
-        if (user.role === 'subject' || user.role === 'admin') {
+        if (user.role === 'subject' || user.role === 'homeroom' || user.role === 'admin') {
           const hr = allClasses.find(
             (c) => Number(c.homeroomTeacher?.id) === Number(user.id)
               || Number(c.homeroom_teacher_id) === Number(user.id),
@@ -61,11 +76,14 @@ export default function useTeacherClasses() {
     return [...uniq.values()];
   }, [user?.role, homeroomClass, assignedClasses]);
 
+  const isHomeroom = user?.capabilities?.is_homeroom ?? !!homeroomClass;
+
   return {
     loading,
     homeroomClass,
     assignedClasses,
     assignments,
     teachingClasses,
+    isHomeroom,
   };
 }

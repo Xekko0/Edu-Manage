@@ -25,16 +25,19 @@ module.exports = {
     const classByName = Object.fromEntries(classes.map((c) => [c.name, c.id]));
     const subjectByCode = Object.fromEntries(subjects.map((s) => [s.code, s.id]));
 
+    const periodsByCode = {
+      TOAN: 4, VLY: 4, VAN: 4, HOA: 3, ANH: 3, TIN: 2, SINH: 2,
+    };
+
     const assignments = [];
 
-    // GVBM dạy đúng môn của mình ở cả 3 lớp
     const teacherSubjectMap = [
       { email: 'gv.toan@edusmart.local', code: 'TOAN' },
-      { email: 'gv.ly@edusmart.local',   code: 'VLY' },
-      { email: 'gv.hoa@edusmart.local',  code: 'HOA' },
-      { email: 'gv.van@edusmart.local',  code: 'VAN' },
-      { email: 'gv.anh@edusmart.local',  code: 'ANH' },
-      { email: 'gv.tin@edusmart.local',  code: 'TIN' },
+      { email: 'gv.ly@edusmart.local', code: 'VLY' },
+      { email: 'gv.hoa@edusmart.local', code: 'HOA' },
+      { email: 'gv.van@edusmart.local', code: 'VAN' },
+      { email: 'gv.anh@edusmart.local', code: 'ANH' },
+      { email: 'gv.tin@edusmart.local', code: 'TIN' },
     ];
 
     for (const { email, code } of teacherSubjectMap) {
@@ -44,6 +47,7 @@ module.exports = {
           class_id: classByName[className],
           subject_id: subjectByCode[code],
           school_year: '2024-2025',
+          periods_per_week: periodsByCode[code] || 2,
           is_active: true,
           created_at: now,
           updated_at: now,
@@ -51,13 +55,15 @@ module.exports = {
       }
     }
 
-    // GVCN 10A1 (cô Lan) đồng thời dạy Sinh học lớp 10A2 → test "GVCN + GVBM"
     assignments.push({
       teacher_id: teacherByEmail['gvcn.10a1@edusmart.local'],
       class_id: classByName['10A2'],
       subject_id: subjectByCode['SINH'],
       school_year: '2024-2025',
-      is_active: true, created_at: now, updated_at: now,
+      periods_per_week: periodsByCode.SINH,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
     });
 
     await queryInterface.bulkInsert('teacher_assignments', assignments);

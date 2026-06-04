@@ -4,6 +4,7 @@ const auth = require('../middleware/auth.middleware');
 const role = require('../middleware/role.middleware');
 const assignment = require('../middleware/assignment.middleware');
 const parentLink = require('../middleware/parent-link.middleware');
+const classView = require('../middleware/class-view.middleware');
 
 const router = express.Router();
 router.use(auth);
@@ -18,6 +19,6 @@ router.get('/student/:student_id', parentLink, ctrl.listByStudent);
 router.get('/student/:student_id/pdf', parentLink, ctrl.exportGradebookPDF);
 
 // Xem toàn bộ điểm theo LỚP — GVCN lớp đó, hoặc GVBM dạy lớp đó (chỉ môn mình)
-router.get('/class/:class_id', role('admin', 'subject'), ctrl.listByClass);
+router.get('/class/:class_id', role('admin', 'subject', 'homeroom'), classView, ctrl.listByClass);
 
 module.exports = router;

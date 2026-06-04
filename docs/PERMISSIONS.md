@@ -9,7 +9,7 @@ Admin
  └── Giáo viên (do admin phân công)
        ├── GVBM (môn × lớp × năm học)   → bảng teacher_assignments
        ├── GVCN (1 lớp × 1 năm học)     → classes.homeroom_teacher_id
-       └── Cả hai: gộp quyền, vẫn 1 tài khoản (role='homeroom' + assignment)
+       └── Cả hai: gộp quyền trên **một tài khoản** `role='subject'` + `homeroom_teacher_id` + `teacher_assignments`
              ├── Học sinh  (chỉ xem — bản thân)
              └── Phụ huynh (chỉ xem — con đã được GVCN liên kết)
 ```

@@ -66,9 +66,10 @@ export const CHAT_PERSONAS = {
   },
 };
 
-/** Suy persona phía client (đồng bộ logic backend). */
+/** Suy persona phía client (đồng bộ `/auth/me` capabilities.persona). */
 export function resolveClientPersona(user, homeroomClass) {
   if (!user) return null;
+  if (user.capabilities?.persona) return user.capabilities.persona;
   if (user.role === 'admin') return 'admin';
   if (user.role === 'parent') return 'parent';
   if (user.role === 'student') return 'student';

@@ -74,35 +74,14 @@ const listByStudent = async (req, res) => {
   }
 };
 
-/** GVCN: xem toàn bộ bảng điểm tất cả HS trong LỚP CHỦ NHIỆM của mình. */
+/** GVCN: xem toàn bộ môn; GVBM: chỉ môn được phân công (classView middleware). */
 const listByClass = async (req, res) => {
   try {
     const { class_id } = req.params;
     const { semester = 1, school_year } = req.query;
 
-    const cls = await Class.findByPk(class_id);
-    if (!cls) return error(res, 'Không tìm thấy lớp', 404);
-
-    const isHomeroom = Number(cls.homeroom_teacher_id) === Number(req.user.id);
-
-    // GVCN (role homeroom legacy hoặc subject + chủ nhiệm): xem tất cả môn
-    if (req.user.role === 'homeroom' && !isHomeroom) {
-      return error(res, 'Bạn không phải GVCN của lớp này', 403);
-    }
-
-    // GVBM: cần assignment; GVCN lớp này được xem toàn bộ môn
-    let subjectFilter = null;
-    if (req.user.role === 'subject') {
-      const assignments = await TeacherAssignment.findAll({
-        where: { teacher_id: req.user.id, class_id, is_active: true },
-      });
-      if (!isHomeroom && assignments.length === 0) {
-        return error(res, 'Bạn không dạy lớp này', 403);
-      }
-      if (!isHomeroom) {
-        subjectFilter = assignments.map((a) => a.subject_id);
-      }
-    }
+    const view = req.classView || {};
+    const subjectFilter = view.isHomeroom ? null : (view.subjectIds || null);
 
     const students = await Student.findAll({
       where: { class_id },

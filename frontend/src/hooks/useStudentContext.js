@@ -36,7 +36,7 @@ export default function useStudentContext() {
         } else {
           const children = res.data.children || [];
           setStudents(children);
-          setSelectedId(children[0]?.id ?? null);
+          setSelectedId(children.length === 1 ? (children[0]?.id ?? null) : null);
         }
       } catch (err) {
         if (!cancelled) setError(err?.message || 'Lỗi tải hồ sơ');

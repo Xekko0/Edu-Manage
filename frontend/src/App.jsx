@@ -16,6 +16,8 @@ import Classes from './pages/admin/Classes';
 import Subjects from './pages/admin/Subjects';
 import Tuitions from './pages/admin/Tuitions';
 import ScheduleManager from './pages/admin/ScheduleManager';
+import CurriculumStandards from './pages/admin/CurriculumStandards';
+import Rooms from './pages/admin/Rooms';
 
 import DashboardHR from './pages/teacher/DashboardHR';
 import DashboardSub from './pages/teacher/DashboardSub';
@@ -37,6 +39,8 @@ import Schedule from './pages/shared/Schedule';
 import Extracurricular from './pages/shared/Extracurricular';
 import Notifications from './pages/shared/Notifications';
 import Profile from './pages/shared/Profile';
+import HomeroomOnly from './components/auth/HomeroomOnly';
+import FamilyStudentGate from './components/family/FamilyStudentGate';
 
 const Protected = ({ children, allow }) => {
   const { user } = useAuth();
@@ -49,7 +53,10 @@ const RoleHome = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user.role === 'subject') return <Navigate to="/teacher/subject" replace />;
+  if (user.role === 'subject' || user.role === 'homeroom') {
+    if (user.capabilities?.is_homeroom) return <Navigate to="/teacher/homeroom" replace />;
+    return <Navigate to="/teacher/subject" replace />;
+  }
   return <Navigate to="/family" replace />;
 };
 
@@ -78,25 +85,27 @@ export default function App() {
           <Route path="/admin/tuitions" element={<Protected allow={['admin']}><Tuitions /></Protected>} />
           <Route path="/admin/reports" element={<Protected allow={['admin']}><Reports /></Protected>} />
           <Route path="/admin/schedules" element={<Protected allow={['admin']}><ScheduleManager /></Protected>} />
+          <Route path="/admin/curriculum" element={<Protected allow={['admin']}><CurriculumStandards /></Protected>} />
+          <Route path="/admin/rooms" element={<Protected allow={['admin']}><Rooms /></Protected>} />
 
           {/* Teacher */}
           <Route path="/teacher/homeroom" element={<Protected allow={['subject','admin']}><DashboardHR /></Protected>} />
           <Route path="/teacher/subject" element={<Protected allow={['subject','admin']}><DashboardSub /></Protected>} />
           <Route path="/teacher/score-entry" element={<Protected allow={['admin','subject']}><ScoreEntry /></Protected>} />
-          <Route path="/teacher/attendance" element={<Protected allow={['admin','subject']}><AttendancePage /></Protected>} />
-          <Route path="/teacher/students" element={<Protected allow={['admin','subject']}><TeacherStudents /></Protected>} />
-          <Route path="/teacher/parents" element={<Protected allow={['admin','subject']}><TeacherParents /></Protected>} />
+          <Route path="/teacher/attendance" element={<Protected allow={['admin','subject']}><HomeroomOnly><AttendancePage /></HomeroomOnly></Protected>} />
+          <Route path="/teacher/students" element={<Protected allow={['admin','subject']}><HomeroomOnly><TeacherStudents /></HomeroomOnly></Protected>} />
+          <Route path="/teacher/parents" element={<Protected allow={['admin','subject']}><HomeroomOnly><TeacherParents /></HomeroomOnly></Protected>} />
           <Route path="/teacher/journal" element={<Protected allow={['admin','subject']}><Journal /></Protected>} />
           <Route path="/teacher/evaluations" element={<Protected allow={['admin','subject']}><TeacherEvaluations /></Protected>} />
-          <Route path="/teacher/reports" element={<Protected allow={['admin','subject']}><TeacherReports /></Protected>} />
+          <Route path="/teacher/reports" element={<Protected allow={['admin','subject']}><HomeroomOnly><TeacherReports /></HomeroomOnly></Protected>} />
           <Route path="/profile" element={<Profile />} />
 
           {/* Family (PH/HS) */}
           <Route path="/family" element={<Protected allow={['parent','student']}><FamilyDashboard /></Protected>} />
-          <Route path="/family/scores" element={<Protected allow={['parent','student']}><Scores /></Protected>} />
-          <Route path="/family/gradebook" element={<Protected allow={['parent','student']}><Gradebook /></Protected>} />
-          <Route path="/family/evaluations" element={<Protected allow={['parent','student']}><FamilyEvaluations /></Protected>} />
-          <Route path="/family/tuition" element={<Protected allow={['parent','student']}><FamilyTuition /></Protected>} />
+          <Route path="/family/scores" element={<Protected allow={['parent','student']}><FamilyStudentGate><Scores /></FamilyStudentGate></Protected>} />
+          <Route path="/family/gradebook" element={<Protected allow={['parent','student']}><FamilyStudentGate><Gradebook /></FamilyStudentGate></Protected>} />
+          <Route path="/family/evaluations" element={<Protected allow={['parent','student']}><FamilyStudentGate><FamilyEvaluations /></FamilyStudentGate></Protected>} />
+          <Route path="/family/tuition" element={<Protected allow={['parent','student']}><FamilyStudentGate><FamilyTuition /></FamilyStudentGate></Protected>} />
 
           {/* Shared */}
           <Route path="/schedule" element={<Schedule />} />
@@ -108,7 +117,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* AI Chatbot Widget — chỉ hiện với PH/HS, tự xử lý ở component */}
+      {/* AI Chatbot Widget — 5 persona (Admin/GVCN/GVBM/PH/HS) */}
       <FloatingChatWidget />
     </>
   );

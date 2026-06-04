@@ -8,9 +8,11 @@ import Select from '../../components/ui/Select';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import { listByStudent } from '../../api/evaluation.api';
-import { CONDUCT_GRADE, CURRENT_SCHOOL_YEAR, EVALUATION_TYPE } from '../../utils/labels';
+import { CONDUCT_GRADE, EVALUATION_TYPE } from '../../utils/labels';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
 export default function FamilyEvaluations() {
+  const { schoolYear } = useSchoolYear();
   const {
     loading: ctxLoading, error: ctxError, selectedId, selectedStudent,
     students, setSelectedId, isParent,
@@ -28,7 +30,7 @@ export default function FamilyEvaluations() {
       try {
         const res = await listByStudent(selectedId, {
           semester,
-          school_year: CURRENT_SCHOOL_YEAR,
+          school_year: schoolYear,
         });
         if (!cancelled && res?.success) setItems(res.data || []);
       } catch (err) {

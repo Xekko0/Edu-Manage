@@ -1,7 +1,10 @@
 import { useState } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { resetPassword } from '../api/auth.api';
+import AuthLayout, { AuthFooterLink } from '../components/auth/AuthLayout';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -31,42 +34,33 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="bg-white rounded-xl shadow-lg p-8 w-full max-w-md">
-        <h1 className="text-xl font-bold text-brand mb-6">Đặt lại mật khẩu</h1>
-        {!token ? (
-          <p className="text-red-600 text-sm">Link thiếu token. Vui lòng dùng link từ email hoặc trang quên MK.</p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
-              placeholder="Mật khẩu mới"
-              required
-            />
-            <input
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              className="w-full px-3 py-2 border rounded-md"
-              placeholder="Xác nhận mật khẩu"
-              required
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-brand text-white py-2 rounded-md disabled:opacity-50"
-            >
-              {loading ? 'Đang lưu…' : 'Lưu mật khẩu'}
-            </button>
-          </form>
-        )}
-        <p className="text-center mt-4 text-sm">
-          <Link to="/login" className="text-brand hover:underline">← Đăng nhập</Link>
-        </p>
-      </div>
-    </div>
+    <AuthLayout
+      title="Đặt lại mật khẩu"
+      footer={<AuthFooterLink to="/login">← Đăng nhập</AuthFooterLink>}
+    >
+      {!token ? (
+        <p className="text-rose-600 text-sm">Link thiếu token. Vui lòng dùng link từ email hoặc trang quên MK.</p>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Mật khẩu mới"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+          <Input
+            label="Xác nhận mật khẩu"
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+          />
+          <Button type="submit" className="w-full" loading={loading}>
+            Lưu mật khẩu
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }

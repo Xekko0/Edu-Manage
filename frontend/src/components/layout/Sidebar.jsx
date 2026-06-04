@@ -3,6 +3,14 @@ import useAuth from '../../hooks/useAuth';
 import { getRoleHomePath } from '../../utils/navigation';
 import useTeacherClasses from '../../hooks/useTeacherClasses';
 
+const homeroomMenu = [
+  { to: '/teacher/homeroom', label: 'Lớp chủ nhiệm' },
+  { to: '/teacher/students', label: 'HS lớp tôi' },
+  { to: '/teacher/parents', label: 'PH lớp tôi' },
+  { to: '/teacher/attendance', label: 'Điểm danh' },
+  { to: '/teacher/reports', label: 'Báo cáo lớp' },
+];
+
 const MENU = {
   admin: [
     { to: '/admin', label: 'Tổng quan' },
@@ -11,6 +19,8 @@ const MENU = {
     { to: '/admin/classes', label: 'Lớp & khối' },
     { to: '/admin/subjects', label: 'Môn học' },
     { to: '/admin/assignments', label: 'Phân công GV' },
+    { to: '/admin/curriculum', label: 'Khung CT khối' },
+    { to: '/admin/rooms', label: 'Phòng học' },
     { to: '/admin/schedules', label: 'Phân bổ TKB' },
     { to: '/admin/tuitions', label: 'Học phí' },
     { to: '/admin/reports', label: 'Báo cáo' },
@@ -54,21 +64,15 @@ export default function Sidebar() {
   const { homeroomClass } = useTeacherClasses();
   let items = MENU[user?.role] || [];
 
-  if (user?.role === 'subject' && homeroomClass) {
-    const extra = [
-      { to: '/teacher/homeroom', label: 'Lớp chủ nhiệm' },
-      { to: '/teacher/students', label: 'HS lớp tôi' },
-      { to: '/teacher/parents', label: 'PH lớp tôi' },
-      { to: '/teacher/attendance', label: 'Điểm danh' },
-      { to: '/teacher/reports', label: 'Báo cáo lớp' },
-    ];
+  const showHomeroom = user?.capabilities?.is_homeroom ?? (user?.role === 'subject' && !!homeroomClass);
+  if ((user?.role === 'subject' || user?.role === 'homeroom') && showHomeroom) {
     items = [
       ...items.slice(0, 1),
-      ...extra,
+      ...homeroomMenu,
       ...items.slice(1),
     ];
   }
-  const homePath = getRoleHomePath(user?.role);
+  const homePath = getRoleHomePath(user?.role, user?.capabilities);
 
   return (
     <aside className="w-60 bg-white border-r min-h-screen p-4 hidden md:block">

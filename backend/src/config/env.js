@@ -36,4 +36,9 @@ module.exports = {
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASS: process.env.SMTP_PASS,
   SMTP_FROM: process.env.SMTP_FROM || 'EduSmart <no-reply@edusmart.local>',
+
+  VAPID_PUBLIC_KEY: process.env.VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT || 'mailto:admin@edusmart.local',
+  ENABLE_SCHEDULE_CRON: process.env.ENABLE_SCHEDULE_CRON,
 };

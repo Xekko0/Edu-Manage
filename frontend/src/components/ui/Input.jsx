@@ -1,16 +1,43 @@
-export default function Input({ label, error, className = '', ...props }) {
-  return (
-    <div className={className}>
-      {label && (
-        <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
+import { cn } from '../../utils/cn';
+import FormField from './FormField';
+
+export default function Input({
+  label,
+  error,
+  helper,
+  required,
+  id,
+  className = '',
+  fieldClassName = '',
+  ...props
+}) {
+  const inputId = id || props.name;
+
+  const control = (
+    <input
+      id={inputId}
+      className={cn(
+        'w-full px-3 py-2 border rounded-lg text-sm bg-white transition-colors focus-ring',
+        error ? 'border-rose-400' : 'border-slate-300 focus:border-primary',
+        className,
       )}
-      <input
-        className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-brand focus:outline-none ${
-          error ? 'border-red-400' : 'border-slate-300'
-        }`}
-        {...props}
-      />
-      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
-    </div>
+      aria-invalid={!!error}
+      {...props}
+    />
+  );
+
+  if (!label && !error && !helper) return control;
+
+  return (
+    <FormField
+      label={label}
+      htmlFor={inputId}
+      error={error}
+      helper={helper}
+      required={required}
+      className={fieldClassName}
+    >
+      {control}
+    </FormField>
   );
 }

@@ -8,9 +8,10 @@ import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
 import GradeChart from '../../components/scores/GradeChart';
 import { classOverview } from '../../api/report.api';
-import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
 export default function TeacherReports() {
+  const { schoolYear } = useSchoolYear();
   const { homeroomClass, loading: clsLoading } = useTeacherClasses();
   const [semester, setSemester] = useState('1');
   const [data, setData] = useState([]);
@@ -25,7 +26,7 @@ export default function TeacherReports() {
     try {
       const res = await classOverview(homeroomClass.id, {
         semester,
-        school_year: CURRENT_SCHOOL_YEAR,
+        school_year: schoolYear,
       });
       if (res?.success) setData(res.data || []);
     } catch (err) {
@@ -33,7 +34,7 @@ export default function TeacherReports() {
     } finally {
       setLoading(false);
     }
-  }, [homeroomClass, semester]);
+  }, [homeroomClass, semester, schoolYear]);
 
   useEffect(() => { loadReport(); }, [loadReport]);
 
