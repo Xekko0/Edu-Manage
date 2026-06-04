@@ -8,6 +8,8 @@ const CurriculumStandard = sequelize.define('CurriculumStandard', {
   school_year: { type: DataTypes.STRING(9), allowNull: false },
   grade_level: { type: DataTypes.INTEGER, allowNull: false },
   subject_id: { type: DataTypes.INTEGER, allowNull: false },
+  total_periods_per_year: { type: DataTypes.INTEGER, allowNull: false },
+  teaching_weeks: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 35 },
   periods_per_week: { type: DataTypes.INTEGER, allowNull: false },
   is_required: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
 }, {

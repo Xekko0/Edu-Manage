@@ -60,13 +60,19 @@ const list = async (req, res) => {
       || ['student', 'parent'].includes(req.user.role);
 
     if (useStudentView) {
-      const slots = await enrichment.enrichSchedulesForStudent(annotated);
+      const config = await scheduleService.getTimetableConfig(school_year);
+      const slots = await enrichment.enrichSchedulesForStudent(annotated, {
+        period_duration_minutes: config.period_duration_minutes,
+      });
       return success(res, {
         view: 'student',
         items: slots,
         slots,
-        conflicts: conflicts.map((c) => enrichment.toStudentSlotView(c, c.roomRef)),
+        conflicts: conflicts.map((c) => enrichment.toStudentSlotView(c, c.roomRef, {
+          period_duration_minutes: config.period_duration_minutes,
+        })),
         maxPeriodsPerWeek: scheduleService.MAX_PERIODS_PER_WEEK,
+        period_duration_minutes: config.period_duration_minutes ?? 45,
       });
     }
 
@@ -111,7 +117,10 @@ const myClass = async (req, res) => {
       order: [['session', 'ASC'], ['day_of_week', 'ASC'], ['period', 'ASC']],
     });
     const annotated = await scheduleService.annotateConflicts(items, school_year);
-    const slots = await enrichment.enrichSchedulesForStudent(annotated);
+    const config = await scheduleService.getTimetableConfig(school_year);
+    const slots = await enrichment.enrichSchedulesForStudent(annotated, {
+      period_duration_minutes: config.period_duration_minutes,
+    });
 
     return success(res, {
       view: 'student',
@@ -119,6 +128,7 @@ const myClass = async (req, res) => {
       school_year,
       items: slots,
       slots,
+      period_duration_minutes: config.period_duration_minutes ?? 45,
     });
   } catch (err) {
     return error(res, err.message || 'Lỗi tải TKB lớp', err.status || 500);
@@ -198,7 +208,13 @@ const validatePayload = async (body, excludeId, reqUser) => {
 const create = async (req, res) => {
   try {
     const warnings = await validatePayload(req.body, null, req.user);
-    const item = await Schedule.create(req.body);
+    const subject = await Subject.findByPk(req.body.subject_id, {
+      attributes: ['program_component'],
+    });
+    const item = await Schedule.create({
+      ...req.body,
+      program_component: subject?.program_component || null,
+    });
     const full = await Schedule.findByPk(item.id, { include: includeDetail });
     const [annotated] = await scheduleService.annotateConflicts([full], req.body.school_year);
     const msg = warnings.length

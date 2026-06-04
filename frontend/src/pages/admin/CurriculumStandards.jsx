@@ -1,4 +1,4 @@
-/** Admin — Khung chương trình theo khối (định mức tiết/tuần). */
+/** Admin — Khung chương trình theo khối (GDPT 2018: tiết/năm, 35 tuần). */
 import { useCallback, useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import PageHeader from '../../components/ui/PageHeader';
@@ -14,9 +14,13 @@ import {
   removeCurriculumStandard,
 } from '../../api/curriculum.api';
 import { listSubjects } from '../../api/subject.api';
-import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { CURRENT_SCHOOL_YEAR, PROGRAM_COMPONENT_LABEL } from '../../utils/labels';
 
 const GRADES = [10, 11, 12];
+const TEACHING_WEEKS = 35;
+
+const deriveWeekly = (total, weeks = TEACHING_WEEKS) =>
+  Math.round(Number(total) / Math.max(1, weeks));
 
 export default function CurriculumStandards() {
   const [items, setItems] = useState([]);
@@ -27,7 +31,8 @@ export default function CurriculumStandards() {
   const [form, setForm] = useState({
     grade_level: '10',
     subject_id: '',
-    periods_per_week: '4',
+    total_periods_per_year: '105',
+    teaching_weeks: String(TEACHING_WEEKS),
     is_required: true,
   });
   const [saving, setSaving] = useState(false);
@@ -53,6 +58,17 @@ export default function CurriculumStandards() {
 
   useEffect(() => { load(); }, [load]);
 
+  const openEdit = (row) => {
+    setForm({
+      grade_level: String(row.grade_level),
+      subject_id: String(row.subject_id),
+      total_periods_per_year: String(row.total_periods_per_year ?? row.periods_per_week * TEACHING_WEEKS),
+      teaching_weeks: String(row.teaching_weeks || TEACHING_WEEKS),
+      is_required: row.is_required !== false,
+    });
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.subject_id) return toast.error('Chọn môn');
@@ -62,7 +78,8 @@ export default function CurriculumStandards() {
         school_year: CURRENT_SCHOOL_YEAR,
         grade_level: Number(form.grade_level),
         subject_id: Number(form.subject_id),
-        periods_per_week: Number(form.periods_per_week),
+        total_periods_per_year: Number(form.total_periods_per_year),
+        teaching_weeks: Number(form.teaching_weeks) || TEACHING_WEEKS,
         is_required: form.is_required,
       });
       if (res?.success) {
@@ -87,17 +104,32 @@ export default function CurriculumStandards() {
     }
   };
 
+  const weeklyPreview = deriveWeekly(form.total_periods_per_year, form.teaching_weeks);
+
   return (
     <div>
-      <PageHeader title="Khung chương trình theo khối">
+      <PageHeader title="Khung chương trình theo khối (GDPT 2018)">
         <Select value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)} className="w-28">
           {GRADES.map((g) => <option key={g} value={g}>Khối {g}</option>)}
         </Select>
-        <Button onClick={() => setModalOpen(true)}>+ Thêm / sửa môn</Button>
+        <Button onClick={() => {
+          setForm({
+            grade_level: gradeFilter,
+            subject_id: '',
+            total_periods_per_year: '105',
+            teaching_weeks: String(TEACHING_WEEKS),
+            is_required: true,
+          });
+          setModalOpen(true);
+        }}
+        >
+          + Thêm / sửa môn
+        </Button>
       </PageHeader>
 
       <p className="text-sm text-slate-600 mb-4">
-        Định mức tiết/tuần theo Bộ GD — phân công GV phải khớp trước khi sinh TKB toàn trường.
+        Nhập <strong>tiết/năm</strong> và <strong>35 tuần</strong> thực học — hệ thống tính tiết/tuần (làm tròn) cho xếp TKB.
+        Môn ~1,5 tiết/tuần (vd. Sử 52/năm) sẽ hiển thị cảnh báo xấp xỉ đến Phase 2 (tuần chẵn/lẻ).
       </p>
 
       {loading ? (
@@ -106,10 +138,13 @@ export default function CurriculumStandards() {
         <EmptyState message="Chưa có khung CT cho khối này." />
       ) : (
         <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm min-w-[480px]">
+          <table className="w-full text-sm min-w-[640px]">
             <thead className="bg-slate-100">
               <tr>
                 <th className="px-3 py-2 text-left">Môn</th>
+                <th className="px-3 py-2 text-center">Loại</th>
+                <th className="px-3 py-2 text-center">Tiết/năm</th>
+                <th className="px-3 py-2 text-center">Tuần</th>
                 <th className="px-3 py-2 text-center">Tiết/tuần</th>
                 <th className="px-3 py-2 text-center">Bắt buộc</th>
                 <th className="px-3 py-2 text-right">Thao tác</th>
@@ -119,9 +154,22 @@ export default function CurriculumStandards() {
               {items.map((row) => (
                 <tr key={row.id} className="border-t">
                   <td className="px-3 py-2">{row.subject?.name} ({row.subject?.code})</td>
-                  <td className="px-3 py-2 text-center font-medium">{row.periods_per_week}</td>
+                  <td className="px-3 py-2 text-center text-xs">
+                    {PROGRAM_COMPONENT_LABEL[row.subject?.program_component] || row.subject?.program_component || '—'}
+                  </td>
+                  <td className="px-3 py-2 text-center">{row.total_periods_per_year}</td>
+                  <td className="px-3 py-2 text-center">{row.teaching_weeks || TEACHING_WEEKS}</td>
+                  <td className="px-3 py-2 text-center font-medium">
+                    {row.periods_per_week}
+                    {row.weekly_approximation && (
+                      <span className="block text-[10px] text-amber-700" title={`Chính xác ~${row.exact_weekly_periods?.toFixed?.(1) ?? row.exact_weekly_periods}`}>
+                        ≈ xấp xỉ
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-center">{row.is_required ? 'Có' : 'Không'}</td>
-                  <td className="px-3 py-2 text-right">
+                  <td className="px-3 py-2 text-right space-x-2">
+                    <button type="button" className="text-brand hover:underline" onClick={() => openEdit(row)}>Sửa</button>
                     <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Xóa</button>
                   </td>
                 </tr>
@@ -138,12 +186,37 @@ export default function CurriculumStandards() {
           </Select>
           <Select label="Môn" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} required>
             <option value="">— Chọn —</option>
-            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+                {' '}
+                ({PROGRAM_COMPONENT_LABEL[s.program_component] || s.program_component})
+              </option>
+            ))}
           </Select>
-          <Input label="Tiết/tuần" type="number" min={1} max={10} value={form.periods_per_week} onChange={(e) => setForm({ ...form, periods_per_week: e.target.value })} required />
+          <Input
+            label="Tổng tiết/năm học"
+            type="number"
+            min={1}
+            max={200}
+            value={form.total_periods_per_year}
+            onChange={(e) => setForm({ ...form, total_periods_per_year: e.target.value })}
+            required
+          />
+          <Input
+            label="Số tuần thực học"
+            type="number"
+            min={1}
+            max={40}
+            value={form.teaching_weeks}
+            onChange={(e) => setForm({ ...form, teaching_weeks: e.target.value })}
+          />
+          <p className="text-sm text-slate-600">
+            Tiết/tuần (tự tính, làm tròn): <strong>{weeklyPreview}</strong>
+          </p>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={form.is_required} onChange={(e) => setForm({ ...form, is_required: e.target.checked })} />
-            Môn bắt buộc
+            Môn bắt buộc theo khung CT
           </label>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setModalOpen(false)}>Hủy</Button>

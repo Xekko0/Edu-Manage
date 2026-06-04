@@ -12,7 +12,7 @@ const formatRoomDisplay = (roomRow, fallbackText) => {
   return fallbackText || '—';
 };
 
-const toStudentSlotView = (schedule, roomRow = null) => {
+const toStudentSlotView = (schedule, roomRow = null, extra = {}) => {
   const raw = schedule.toJSON ? schedule.toJSON() : schedule;
   const roomDisplay = formatRoomDisplay(
     roomRow || raw.roomRef,
@@ -37,6 +37,8 @@ const toStudentSlotView = (schedule, roomRow = null) => {
     class_id: raw.class_id,
     class_name: raw.class?.name || null,
     school_year: raw.school_year,
+    program_component: raw.program_component || raw.subject?.program_component || null,
+    period_duration_minutes: extra.period_duration_minutes ?? 45,
     conflictTypes: raw.conflictTypes || [],
   };
 };
@@ -51,12 +53,13 @@ const loadRoomsByIds = async (schedules) => {
   return new Map(rows.map((r) => [r.id, r]));
 };
 
-const enrichSchedulesForStudent = async (schedules) => {
+const enrichSchedulesForStudent = async (schedules, options = {}) => {
   const roomMap = await loadRoomsByIds(schedules);
+  const extra = { period_duration_minutes: options.period_duration_minutes ?? 45 };
   return schedules.map((s) => {
     const raw = s.toJSON ? s.toJSON() : s;
     const roomRow = raw.room_id ? roomMap.get(raw.room_id) : raw.roomRef;
-    return toStudentSlotView(s, roomRow);
+    return toStudentSlotView(s, roomRow, extra);
   });
 };
 

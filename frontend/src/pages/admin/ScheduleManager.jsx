@@ -273,6 +273,7 @@ export default function ScheduleManager() {
         morning_periods: Number(configForm.morning_periods),
         afternoon_periods: Number(configForm.afternoon_periods),
         afternoon_enabled: configForm.afternoon_enabled,
+        period_duration_minutes: Number(configForm.period_duration_minutes) || 45,
       });
       if (res?.success) {
         setTimetableConfig(res.data);
@@ -598,6 +599,16 @@ export default function ScheduleManager() {
             />
             Có ca chiều
           </label>
+          <Input
+            label="Thời lượng 1 tiết (phút)"
+            type="number"
+            min={30}
+            max={60}
+            className="w-28"
+            value={configForm.period_duration_minutes ?? 45}
+            onChange={(e) => setConfigForm({ ...configForm, period_duration_minutes: e.target.value })}
+            title="GDPT 2018: mỗi tiết 45 phút"
+          />
           <Button type="button" variant="secondary" disabled={configSaving} onClick={saveTimetableConfig}>
             {configSaving ? 'Đang lưu…' : 'Lưu khung giờ'}
           </Button>
@@ -611,7 +622,8 @@ export default function ScheduleManager() {
       )}
 
       <p className="mb-2 text-xs text-slate-500">
-        **Tự động xếp lịch** tự đồng bộ số tiết phân công theo khung CT, xóa và sinh lại TKB lớp (ràng buộc cứng: không trùng GV/lớp/phòng).
+        **Tự động xếp lịch** tự đồng bộ phân công theo khung CT, xóa và sinh lại TKB lớp.
+        Ràng buộc GDPT: tối đa <strong>7 tiết/ngày/lớp</strong>, tiết học <strong>45 phút</strong>.
       </p>
 
       {schoolValidation && (
@@ -695,6 +707,21 @@ export default function ScheduleManager() {
           )}
           {!validation.can_generate && (
             <span className="text-red-600 text-xs">Tổng tiết vượt quá {validation.grid_slots} ô lưới</span>
+          )}
+          {validation.gdpt_weekly_warning && (
+            <span className="text-amber-800 text-xs block max-w-md">
+              {validation.gdpt_weekly_warning.message
+                || (Array.isArray(validation.gdpt_weekly_warning)
+                  ? validation.gdpt_weekly_warning.map((w) => w.message).join('; ')
+                  : null)}
+            </span>
+          )}
+          {validation.weekly_approximation_subjects?.length > 0 && (
+            <span className="text-amber-700 text-xs">
+              {validation.weekly_approximation_subjects.length}
+              {' '}
+              môn xếp tuần làm tròn (vd. Sử ~1,5 tiết/tuần) — Phase 2: tuần chẵn/lẻ.
+            </span>
           )}
         </div>
       )}

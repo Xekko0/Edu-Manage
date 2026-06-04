@@ -38,7 +38,7 @@ flowchart LR
 
 | Module | API / trang | Vai trò với TKB |
 |--------|-------------|-----------------|
-| **Khung chương trình khối** | `/admin/curriculum`, `GET/PUT /api/curriculum-standards` | Định mức `periods_per_week` theo khối + môn (vd. Toán 4 tiết). Là chuẩn khi đồng bộ phân công và khi kiểm tra validation. |
+| **Khung chương trình khối** | `/admin/curriculum`, `GET/PUT /api/curriculum-standards` | **GDPT Phase 1:** `total_periods_per_year` + `teaching_weeks` (35) → `periods_per_week` làm tròn. Đồng bộ phân công khi «Tự động xếp lịch». |
 | **Phân công giáo viên** | `/admin/assignments`, `GET/POST /api/assignments` | Mỗi bản ghi = GV dạy môn X cho lớp Y, `periods_per_week`. Không có phân công → không sinh / không kéo môn vào lưới. |
 | **Khung giờ** | Trên `/admin/schedules`, `GET/PUT /api/timetable-config` | Ngày dạy (T2–CN), số tiết ca sáng/chiều (≤ 5), bật ca chiều. Quyết định **số ô lưới** (`grid_slots`). |
 | **Phòng học** | `/admin/rooms`, `GET/POST /api/rooms` | Dùng khi sinh TKB tự động (`room_id`, loại phòng Lab/Tin…). CRUD tay có thể ghi `room` text. |
@@ -151,9 +151,11 @@ sequenceDiagram
 | **Cứng — ô lớp** | Tối đa 1 tiết / `(class, day, session, period)` | API 400 «Ô lớp này đã có tiết học» |
 | **Cứng — ô GV** | Tối đa 1 tiết / `(teacher, day, session, period)` toàn trường | API 400 «Giáo viên đã có tiết…» |
 | **Cứng — phòng** | Cùng `room` không trùng khung giờ | API 400 «Phòng đã được sử dụng…» |
+| **Cứng — 7 tiết/ngày/lớp (GDPT)** | Tối đa 7 tiết / `(class, day)` gộp ca sáng+chiều | API 400 / `daily_limit` trên lưới |
 | **Khung CT** | `periods_per_week` phân công = chuẩn khối (sau sync) | Validation `curriculum_ok`; auto-arrange sync trước khi sinh |
 | **Mềm — cảnh báo** | `annotateConflicts` | Ô đỏ trên lưới; vẫn có thể lưu với `warnings` (tùy endpoint) |
 | **Tải GV** | `MAX_PERIODS_PER_WEEK` | Cảnh báo khi vượt (không chặn tạo tay mặc định) |
+| **Tiết 45 phút** | `timetable_configs.period_duration_minutes` | Hiển thị HS/PH; gợi ý `period_times` |
 
 ---
 
@@ -265,7 +267,21 @@ GV/Admin cập nhật qua `PATCH /schedules/:id/lesson`.
 
 ---
 
-## 11. Tài liệu liên quan
+## 11. GDPT 2018 — Giai đoạn 1 (đã triển khai)
+
+| Hạng mục | Chi tiết |
+|----------|----------|
+| Khung CT | `total_periods_per_year`, `teaching_weeks=35`, `periods_per_week=round(total/weeks)` |
+| Môn học | `subjects.program_component`: `required_core`, `required_activity`, `elective`, … |
+| Xếp lịch | Ưu tiên nhóm môn: bắt buộc → hoạt động → lựa chọn; greedy ưu tiên ngày ít tiết |
+| Chuẩn khối | Cảnh báo `gdpt_weekly_warning` nếu tổng tiết/tuần lệch ~29 (10) / ~29,5 (11–12) |
+| Xấp xỉ | Môn ~1,5 tiết/tuần (Sử 52/năm) → xếp **1** tiết/tuần làm tròn; flag `weekly_approximation` |
+
+**Roadmap Phase 2–4:** tuần chẵn/lẻ, tách phân công chuyên đề, TKB cá nhân HS, dashboard tải GV theo 35 tuần.
+
+---
+
+## 12. Tài liệu liên quan
 
 - [ACCOUNTS.md](./ACCOUNTS.md) — tài khoản demo.
 - [FLOWS.md](./FLOWS.md) — luồng hệ thống (mục TKB).

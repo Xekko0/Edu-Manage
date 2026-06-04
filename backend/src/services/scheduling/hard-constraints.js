@@ -1,9 +1,13 @@
 'use strict';
 
 const { slotKey, roomSlotKey } = require('./busy-state');
-const { MAX_PERIODS_PER_WEEK, MAX_PERIODS_PER_SESSION } = require('./constants');
+const {
+  MAX_PERIODS_PER_WEEK, MAX_PERIODS_PER_SESSION, MAX_PERIODS_PER_DAY_CLASS,
+} = require('./constants');
 
-const HARD_TYPES = ['teacher', 'class', 'room', 'curriculum', 'session_cap', 'weekly_limit'];
+const HARD_TYPES = [
+  'teacher', 'class', 'room', 'curriculum', 'session_cap', 'weekly_limit', 'daily_limit',
+];
 
 const detectHardViolationsFromSchedules = (schedules, options = {}) => {
   const violations = [];
@@ -11,6 +15,7 @@ const detectHardViolationsFromSchedules = (schedules, options = {}) => {
   const byTeacherSlot = new Map();
   const byRoomSlot = new Map();
   const teacherWeekCount = new Map();
+  const classDayCount = new Map();
 
   for (const s of schedules) {
     const raw = s.toJSON ? s.toJSON() : s;
@@ -22,6 +27,8 @@ const detectHardViolationsFromSchedules = (schedules, options = {}) => {
     if (!byTeacherSlot.has(tk)) byTeacherSlot.set(tk, []);
     byTeacherSlot.get(tk).push(raw);
     teacherWeekCount.set(raw.teacher_id, (teacherWeekCount.get(raw.teacher_id) || 0) + 1);
+    const dayKey = `${raw.class_id}|${raw.day_of_week}`;
+    classDayCount.set(dayKey, (classDayCount.get(dayKey) || 0) + 1);
     const rk = roomSlotKey(raw.room, raw.day_of_week, raw.session, raw.period);
     if (rk) {
       if (!byRoomSlot.has(rk)) byRoomSlot.set(rk, []);
@@ -96,6 +103,19 @@ const detectHardViolationsFromSchedules = (schedules, options = {}) => {
     }
   }
 
+  for (const [dayKey, count] of classDayCount) {
+    if (count > MAX_PERIODS_PER_DAY_CLASS) {
+      const [classId, day] = dayKey.split('|');
+      violations.push({
+        type: 'daily_limit',
+        class_id: parseInt(classId, 10),
+        day_of_week: parseInt(day, 10),
+        count,
+        message: `Lớp vượt ${MAX_PERIODS_PER_DAY_CLASS} tiết/ngày (Thứ ${day}: ${count} tiết)`,
+      });
+    }
+  }
+
   if (options.curriculumMismatches?.length) {
     for (const m of options.curriculumMismatches) {
       violations.push({ type: 'curriculum', ...m });
@@ -121,4 +141,5 @@ module.exports = {
   summarizeViolations,
   MAX_PERIODS_PER_SESSION,
   MAX_PERIODS_PER_WEEK,
+  MAX_PERIODS_PER_DAY_CLASS,
 };

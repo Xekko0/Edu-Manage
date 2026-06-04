@@ -10,6 +10,11 @@ const Subject = sequelize.define('Subject', {
   name: { type: DataTypes.STRING(100), allowNull: false },
   description: { type: DataTypes.TEXT },
   preferred_room_type: { type: DataTypes.STRING(20), allowNull: true },
+  program_component: {
+    type: DataTypes.STRING(30),
+    allowNull: false,
+    defaultValue: 'elective',
+  },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
 }, {
   tableName: 'subjects',

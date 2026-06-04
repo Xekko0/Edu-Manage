@@ -6,6 +6,7 @@ export const defaultTimetableConfig = () => ({
   morning_periods: 5,
   afternoon_periods: 5,
   afternoon_enabled: true,
+  period_duration_minutes: 45,
   sessions: ['morning', 'afternoon'],
 });
 

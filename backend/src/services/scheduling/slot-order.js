@@ -37,6 +37,10 @@ const normalizeTimetableConfig = (row) => {
     afternoon_periods: afternoon,
     afternoon_enabled: afternoonEnabled,
     period_times: parsePeriodTimes(row?.period_times),
+    period_duration_minutes: parseInt(row?.period_duration_minutes, 10) || 45,
+    grade_10_annual_periods: row?.grade_10_annual_periods ?? 1015,
+    grade_11_annual_periods: row?.grade_11_annual_periods ?? 1032,
+    grade_12_annual_periods: row?.grade_12_annual_periods ?? 1032,
     sessions,
     max_periods_per_session: MAX_PERIODS_PER_SESSION,
   };

@@ -39,8 +39,25 @@ export const CONFLICT_LABEL = {
   teacher: 'Trùng lịch GV',
   room: 'Trùng phòng',
   weekly_limit: 'Vượt giới hạn tiết/tuần',
+  daily_limit: 'Vượt 7 tiết/ngày (GDPT)',
   curriculum: 'Lệch khung CT khối',
   session_cap: 'Vượt 5 tiết/buổi',
+};
+
+export const PROGRAM_COMPONENT_LABEL = {
+  required_core: 'Môn bắt buộc',
+  required_activity: 'Hoạt động bắt buộc',
+  elective: 'Môn lựa chọn',
+  specialty_cluster: 'Chuyên đề',
+  optional_elective: 'Tự chọn',
+};
+
+export const PROGRAM_COMPONENT_BADGE = {
+  required_core: 'bg-blue-100 text-blue-800',
+  required_activity: 'bg-slate-200 text-slate-800',
+  elective: 'bg-amber-100 text-amber-900',
+  specialty_cluster: 'bg-violet-100 text-violet-800',
+  optional_elective: 'bg-teal-100 text-teal-800',
 };
 
 export const ROOM_TYPE_LABEL = {

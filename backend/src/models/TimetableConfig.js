@@ -11,6 +11,10 @@ const TimetableConfig = sequelize.define('TimetableConfig', {
   afternoon_periods: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 5 },
   afternoon_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
   period_times: { type: DataTypes.JSON, allowNull: true },
+  period_duration_minutes: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 45 },
+  grade_10_annual_periods: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1015 },
+  grade_11_annual_periods: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1032 },
+  grade_12_annual_periods: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1032 },
 }, {
   tableName: 'timetable_configs',
   underscored: true,

@@ -1,5 +1,9 @@
 import ScheduleGridTable from './ScheduleGridTable';
-import { SESSION_LABEL } from '../../utils/labels';
+import {
+  SESSION_LABEL,
+  PROGRAM_COMPONENT_LABEL,
+  PROGRAM_COMPONENT_BADGE,
+} from '../../utils/labels';
 import { gridFromTimetableConfig } from '../../utils/timetableGrid';
 
 const MODE_LABEL = { offline: 'Trực tiếp', online: 'Trực tuyến' };
@@ -14,6 +18,14 @@ function StudentSlotCell({ slot, onSelect }) {
       className="text-xs leading-tight text-left w-full p-1.5 rounded bg-slate-50 hover:bg-brand/5 border border-slate-200 hover:border-brand/40 transition-colors"
     >
       <div className="font-semibold text-brand">{slot.subject}</div>
+      {slot.program_component && (
+        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+          PROGRAM_COMPONENT_BADGE[slot.program_component] || 'bg-slate-100 text-slate-700'
+        }`}
+        >
+          {PROGRAM_COMPONENT_LABEL[slot.program_component] || slot.program_component}
+        </span>
+      )}
       <div className="text-slate-600">{slot.teacher_name}</div>
       <div className="text-slate-500 truncate" title={slot.room}>{slot.room}</div>
       <div className="flex flex-wrap gap-1 mt-1">
@@ -65,8 +77,17 @@ export default function StudentScheduleView({
   const sessionOptions = timetableConfig?.sessions || ['morning'];
   const grid = gridFromTimetableConfig(timetableConfig, session);
 
+  const periodMin = timetableConfig?.period_duration_minutes ?? 45;
+
   return (
     <div>
+      <p className="text-xs text-slate-500 mb-2">
+        Mỗi tiết học:
+        {' '}
+        <strong>{periodMin}</strong>
+        {' '}
+        phút (GDPT 2018). TKB hiển thị theo lớp — môn lựa chọn cá nhân sẽ có ở Phase 3.
+      </p>
       <div className="flex gap-1 mb-3">
         {sessionOptions.map((s) => (
           <button

@@ -1,6 +1,10 @@
 import Button from '../ui/Button';
 import Modal from '../ui/Modal';
-import { DAY_OF_WEEK } from '../../utils/labels';
+import {
+  DAY_OF_WEEK,
+  PROGRAM_COMPONENT_LABEL,
+  PROGRAM_COMPONENT_BADGE,
+} from '../../utils/labels';
 
 const MODE_LABEL = { offline: 'Trực tiếp', online: 'Trực tuyến' };
 
@@ -22,7 +26,21 @@ export default function ScheduleSlotDetail({ slot, open, onClose }) {
             {slot.session === 'afternoon' ? 'Ca chiều' : 'Ca sáng'}
             {' · Tiết '}
             {slot.period}
+            {slot.period_duration_minutes ? ` (${slot.period_duration_minutes} phút)` : ' (45 phút)'}
           </span>
+          {slot.program_component && (
+            <>
+              <span className="text-slate-500">Loại môn</span>
+              <span>
+                <span className={`inline-block px-2 py-0.5 rounded text-xs ${
+                  PROGRAM_COMPONENT_BADGE[slot.program_component] || ''
+                }`}
+                >
+                  {PROGRAM_COMPONENT_LABEL[slot.program_component] || slot.program_component}
+                </span>
+              </span>
+            </>
+          )}
           <span className="text-slate-500">Giáo viên</span>
           <span className="font-medium">{slot.teacher_name || '—'}</span>
           <span className="text-slate-500">Phòng</span>

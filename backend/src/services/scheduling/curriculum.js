@@ -2,6 +2,42 @@
 
 const { Op } = require('sequelize');
 const { CurriculumStandard, Class, Subject, TeacherAssignment } = require('../../models');
+const {
+  DEFAULT_TEACHING_WEEKS,
+  EXPECTED_WEEKLY_BY_GRADE,
+} = require('./constants');
+
+const deriveWeeklyPeriods = (totalPeriodsPerYear, teachingWeeks = DEFAULT_TEACHING_WEEKS) => {
+  const weeks = Math.max(1, parseInt(teachingWeeks, 10) || DEFAULT_TEACHING_WEEKS);
+  const total = parseInt(totalPeriodsPerYear, 10);
+  return Math.round(total / weeks);
+};
+
+const exactWeeklyPeriods = (totalPeriodsPerYear, teachingWeeks = DEFAULT_TEACHING_WEEKS) => {
+  const weeks = Math.max(1, parseInt(teachingWeeks, 10) || DEFAULT_TEACHING_WEEKS);
+  return parseInt(totalPeriodsPerYear, 10) / weeks;
+};
+
+const hasWeeklyApproximation = (totalPeriodsPerYear, teachingWeeks, roundedWeekly) => {
+  const exact = exactWeeklyPeriods(totalPeriodsPerYear, teachingWeeks);
+  return Math.abs(exact - roundedWeekly) >= 0.01;
+};
+
+const standardToPayload = (row) => {
+  const json = row.toJSON ? row.toJSON() : row;
+  const weeks = json.teaching_weeks || DEFAULT_TEACHING_WEEKS;
+  const total = json.total_periods_per_year;
+  const weekly = json.periods_per_week ?? deriveWeeklyPeriods(total, weeks);
+  const exact = exactWeeklyPeriods(total, weeks);
+  return {
+    ...json,
+    teaching_weeks: weeks,
+    periods_per_week: weekly,
+    derived_periods_per_week: weekly,
+    exact_weekly_periods: exact,
+    weekly_approximation: hasWeeklyApproximation(total, weeks, weekly),
+  };
+};
 
 const getCurriculumPeriods = async ({ school_year, grade_level, subject_id }) => {
   const row = await CurriculumStandard.findOne({
@@ -11,11 +47,16 @@ const getCurriculumPeriods = async ({ school_year, grade_level, subject_id }) =>
 };
 
 const listCurriculumForGrade = async (school_year, grade_level) => {
-  return CurriculumStandard.findAll({
+  const rows = await CurriculumStandard.findAll({
     where: { school_year, grade_level },
-    include: [{ model: Subject, as: 'subject', attributes: ['id', 'code', 'name'] }],
+    include: [{
+      model: Subject,
+      as: 'subject',
+      attributes: ['id', 'code', 'name', 'program_component'],
+    }],
     order: [['subject_id', 'ASC']],
   });
+  return rows.map(standardToPayload);
 };
 
 const validateAssignmentAgainstCurriculum = async ({
@@ -59,7 +100,7 @@ const validateAssignmentAgainstCurriculum = async ({
         ok: false,
         warning: true,
         grade_level: cls.grade_level,
-        standard: standard.toJSON(),
+        standard: standardToPayload(standard),
         required,
         actual,
       };
@@ -76,7 +117,7 @@ const validateAssignmentAgainstCurriculum = async ({
   return {
     ok: true,
     grade_level: cls.grade_level,
-    standard: standard.toJSON(),
+    standard: standardToPayload(standard),
     required,
     actual,
   };
@@ -86,7 +127,7 @@ const buildCurriculumStandardMap = async (school_year) => {
   const rows = await CurriculumStandard.findAll({ where: { school_year } });
   const map = new Map();
   for (const r of rows) {
-    map.set(`${r.grade_level}|${r.subject_id}`, r.periods_per_week);
+    map.set(`${r.grade_level}|${r.subject_id}`, standardToPayload(r));
   }
   return map;
 };
@@ -97,12 +138,32 @@ const resolveRequiredPeriods = (assignment, standardMap) => {
     ? standardMap.get(`${grade}|${assignment.subject_id}`)
     : undefined;
   const assignmentPeriods = Math.max(1, assignment.periods_per_week || 2);
-  const required = std != null ? std : assignmentPeriods;
+  let required = assignmentPeriods;
+  let curriculumRequired = null;
+  let weeklyApproximation = false;
+  let exactWeekly = null;
+
+  if (std != null) {
+    if (typeof std === 'object') {
+      required = std.periods_per_week;
+      curriculumRequired = std.periods_per_week;
+      exactWeekly = std.exact_weekly_periods;
+      weeklyApproximation = std.weekly_approximation;
+    } else {
+      required = std;
+      curriculumRequired = std;
+    }
+  }
+
   return {
     required,
-    curriculum_required: std ?? null,
+    curriculum_required: curriculumRequired,
     assignment_periods: assignmentPeriods,
-    curriculum_aligned: std == null || std === assignmentPeriods,
+    curriculum_aligned: curriculumRequired == null || curriculumRequired === assignmentPeriods,
+    exact_weekly_periods: exactWeekly,
+    weekly_approximation: weeklyApproximation,
+    total_periods_per_year: typeof std === 'object' ? std.total_periods_per_year : null,
+    teaching_weeks: typeof std === 'object' ? std.teaching_weeks : null,
   };
 };
 
@@ -112,7 +173,6 @@ const collectCurriculumMismatches = async (school_year, class_ids = null) => {
     classWhere.id = { [Op.in]: class_ids.map((id) => parseInt(id, 10)) };
   }
   const classes = await Class.findAll({ where: classWhere, attributes: ['id', 'name', 'grade_level'] });
-  const { TeacherAssignment } = require('../../models');
   const mismatches = [];
 
   for (const cls of classes) {
@@ -155,6 +215,7 @@ const collectCurriculumMismatches = async (school_year, class_ids = null) => {
           subject_name: a.subject?.name,
           required,
           actual,
+          total_periods_per_year: standard.total_periods_per_year,
           message: `${cls.name}: ${a.subject?.name} cần ${required} tiết/tuần, phân công ${actual}`,
         });
       }
@@ -164,7 +225,6 @@ const collectCurriculumMismatches = async (school_year, class_ids = null) => {
   return mismatches;
 };
 
-/** Cập nhật periods_per_week trên phân công GV theo khung CT khối (admin). */
 const syncAssignmentsFromCurriculum = async (school_year) => {
   const assignments = await TeacherAssignment.findAll({
     where: { school_year, is_active: true },
@@ -204,6 +264,7 @@ const syncAssignmentsFromCurriculum = async (school_year) => {
         subject_name: a.subject?.name,
         from,
         to: required,
+        total_periods_per_year: standard.total_periods_per_year,
       });
     }
   }
@@ -219,7 +280,51 @@ const syncAssignmentsFromCurriculum = async (school_year) => {
   };
 };
 
+const computeGdptWeeklyWarning = (gradeLevel, sumWeeklyRequired) => {
+  const expected = EXPECTED_WEEKLY_BY_GRADE[gradeLevel];
+  if (expected == null) return null;
+  const delta = sumWeeklyRequired - expected;
+  if (Math.abs(delta) <= 2) return null;
+  return {
+    grade_level: gradeLevel,
+    expected_weekly: expected,
+    actual_weekly: sumWeeklyRequired,
+    delta,
+    message: `Khối ${gradeLevel}: tổng ${sumWeeklyRequired} tiết/tuần lệch chuẩn GDPT ~${expected} (±2)`,
+  };
+};
+
+const upsertCurriculumFields = ({
+  total_periods_per_year,
+  teaching_weeks = DEFAULT_TEACHING_WEEKS,
+  periods_per_week: legacyWeekly,
+}) => {
+  const weeks = Math.max(1, parseInt(teaching_weeks, 10) || DEFAULT_TEACHING_WEEKS);
+  let total = parseInt(total_periods_per_year, 10);
+  if (Number.isNaN(total) && legacyWeekly != null) {
+    total = parseInt(legacyWeekly, 10) * weeks;
+  }
+  if (Number.isNaN(total) || total < 1) {
+    const err = new Error('total_periods_per_year không hợp lệ');
+    err.status = 400;
+    throw err;
+  }
+  const weekly = deriveWeeklyPeriods(total, weeks);
+  return {
+    total_periods_per_year: total,
+    teaching_weeks: weeks,
+    periods_per_week: weekly,
+    exact_weekly_periods: total / weeks,
+    weekly_approximation: hasWeeklyApproximation(total, weeks, weekly),
+  };
+};
+
 module.exports = {
+  deriveWeeklyPeriods,
+  exactWeeklyPeriods,
+  standardToPayload,
+  upsertCurriculumFields,
+  computeGdptWeeklyWarning,
   getCurriculumPeriods,
   listCurriculumForGrade,
   validateAssignmentAgainstCurriculum,

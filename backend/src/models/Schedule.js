@@ -27,6 +27,7 @@ const Schedule = sequelize.define('Schedule', {
   lesson_topic: { type: DataTypes.STRING(200), allowNull: true },
   homework_reminder: { type: DataTypes.TEXT, allowNull: true },
   school_year: { type: DataTypes.STRING(9), allowNull: false },
+  program_component: { type: DataTypes.STRING(30), allowNull: true },
 }, {
   tableName: 'schedules',
   /** TKB dùng unique index ô lớp/GV — không soft-delete (tránh “ô trống” nhưng không thêm được). */

@@ -20,8 +20,10 @@ const {
   releaseSlot,
   slotEquals,
   slotKey,
+  sortSlotsByClassDayLoad,
   collectCurriculumMismatches,
   syncAssignmentsFromCurriculum,
+  computeGdptWeeklyWarning,
   buildCurriculumStandardMap,
   resolveRequiredPeriods,
   pickRoomForSlot,
@@ -30,6 +32,8 @@ const {
   summarizeViolations,
   MAX_PERIODS_PER_WEEK,
   MAX_PERIODS_PER_SESSION,
+  MAX_PERIODS_PER_DAY_CLASS,
+  PROGRAM_COMPONENT_ORDER,
 } = scheduling;
 
 const SCHEDULE_DAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -102,6 +106,9 @@ const upsertTimetableConfig = async (school_year, patch) => {
     ...(patch.afternoon_enabled !== undefined
       ? { afternoon_enabled: !!patch.afternoon_enabled }
       : {}),
+    ...(patch.period_duration_minutes !== undefined
+      ? { period_duration_minutes: Math.max(30, parseInt(patch.period_duration_minutes, 10) || 45) }
+      : {}),
   };
 
   try {
@@ -162,6 +169,23 @@ const assertHardSlotFree = async ({
       err.code = 'ROOM_SLOT_TAKEN';
       throw err;
     }
+  }
+
+  const dayCount = await Schedule.count({
+    where: {
+      school_year,
+      class_id,
+      day_of_week,
+      ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
+    },
+  });
+  if (dayCount >= MAX_PERIODS_PER_DAY_CLASS) {
+    const err = new Error(
+      `Lớp đã đạt tối đa ${MAX_PERIODS_PER_DAY_CLASS} tiết/ngày (GDPT 2018)`,
+    );
+    err.status = 400;
+    err.code = 'DAILY_LIMIT';
+    throw err;
   }
 };
 
@@ -267,6 +291,7 @@ const annotateConflicts = async (items, school_year) => {
   const byTeacherSlot = new Map();
   const byRoomSlot = new Map();
   const teacherWeekCount = new Map();
+  const classDayCount = new Map();
 
   for (const s of allInYear) {
     const key = slotKey(s.day_of_week, s.session, s.period);
@@ -277,6 +302,8 @@ const annotateConflicts = async (items, school_year) => {
     if (!byTeacherSlot.has(tk)) byTeacherSlot.set(tk, []);
     byTeacherSlot.get(tk).push(s.id);
     teacherWeekCount.set(s.teacher_id, (teacherWeekCount.get(s.teacher_id) || 0) + 1);
+    const dk = `${s.class_id}|${s.day_of_week}`;
+    classDayCount.set(dk, (classDayCount.get(dk) || 0) + 1);
     if (s.room) {
       const rk = `${s.room}|${key}`;
       if (!byRoomSlot.has(rk)) byRoomSlot.set(rk, []);
@@ -299,8 +326,25 @@ const annotateConflicts = async (items, school_year) => {
     if ((teacherWeekCount.get(raw.teacher_id) || 0) > MAX_PERIODS_PER_WEEK) {
       types.push('weekly_limit');
     }
+    const dk = `${raw.class_id}|${raw.day_of_week}`;
+    if ((classDayCount.get(dk) || 0) > MAX_PERIODS_PER_DAY_CLASS) {
+      types.push('daily_limit');
+    }
     return { ...raw, conflictTypes: types };
   });
+};
+
+const sortAssignmentsByProgram = (assignments) => {
+  const list = [...assignments];
+  list.sort((a, b) => {
+    const compA = a.subject?.program_component || 'elective';
+    const compB = b.subject?.program_component || 'elective';
+    const oa = PROGRAM_COMPONENT_ORDER[compA] ?? 99;
+    const ob = PROGRAM_COMPONENT_ORDER[compB] ?? 99;
+    if (oa !== ob) return oa - ob;
+    return (b.periods_per_week || 0) - (a.periods_per_week || 0);
+  });
+  return list;
 };
 
 const placeAssignmentSlots = async ({
@@ -320,11 +364,13 @@ const placeAssignmentSlots = async ({
   let placed = 0;
 
   const preferredRoomType = await resolvePreferredRoomType(assignment.subject_id);
+  const orderedSlots = sortSlotsByClassDayLoad(slotOrder, busy, classId);
+  const programComponent = assignment.subject?.program_component || null;
 
   for (let i = 0; i < need; i++) {
     let found = null;
     let roomPick = null;
-    for (const slot of slotOrder) {
+    for (const slot of orderedSlots) {
       const candidateRoom = await pickRoomForSlot({
         busy,
         slot,
@@ -360,6 +406,7 @@ const placeAssignmentSlots = async ({
       room: roomPick.roomName,
       room_id: roomPick.roomId,
       school_year: schoolYear,
+      program_component: programComponent,
     });
     occupySlot(busy, classId, assignment.teacher_id, found, roomPick.roomName);
     created.push(row);
@@ -499,10 +546,15 @@ const generateClassSchedule = async ({
     throw err;
   }
 
-  const assignments = await TeacherAssignment.findAll({
+  const assignmentsRaw = await TeacherAssignment.findAll({
     where: { class_id, school_year, is_active: true },
-    order: [['periods_per_week', 'DESC'], ['id', 'ASC']],
+    include: [{
+      model: Subject,
+      as: 'subject',
+      attributes: ['id', 'code', 'name', 'program_component'],
+    }],
   });
+  const assignments = sortAssignmentsByProgram(assignmentsRaw);
   if (!assignments.length) {
     const err = new Error('Lớp chưa có phân công giáo viên');
     err.status = 400;
@@ -784,7 +836,7 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
   const assignments = await TeacherAssignment.findAll({
     where: assignWhere,
     include: [
-      { model: Subject, as: 'subject', attributes: ['id', 'name', 'code'] },
+      { model: Subject, as: 'subject', attributes: ['id', 'name', 'code', 'program_component'] },
       { model: User, as: 'teacher', attributes: ['id', 'full_name'] },
       { model: Class, as: 'class', attributes: ['id', 'name', 'grade_level'] },
     ],
@@ -804,26 +856,35 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
   const standardMap = await buildCurriculumStandardMap(school_year);
 
   const rows = assignments.map((a) => {
+    const resolved = resolveRequiredPeriods(a, standardMap);
     const {
       required,
       curriculum_required: curriculumRequired,
       assignment_periods: assignmentPeriods,
       curriculum_aligned: curriculumAligned,
-    } = resolveRequiredPeriods(a, standardMap);
+      weekly_approximation: weeklyApproximation,
+      exact_weekly_periods: exactWeekly,
+      total_periods_per_year: totalYear,
+    } = resolved;
     const k = `${a.class_id}|${a.subject_id}|${a.teacher_id}`;
     const placed = placedByKey.get(k) || 0;
     return {
       assignment_id: a.id,
       class_id: a.class_id,
       class_name: a.class?.name,
+      grade_level: a.class?.grade_level,
       subject_id: a.subject_id,
       subject_name: a.subject?.name,
+      program_component: a.subject?.program_component,
       teacher_id: a.teacher_id,
       teacher_name: a.teacher?.full_name,
       required,
       curriculum_required: curriculumRequired,
       assignment_periods: assignmentPeriods,
       curriculum_aligned: curriculumAligned,
+      exact_weekly_periods: exactWeekly,
+      weekly_approximation: weeklyApproximation,
+      total_periods_per_year: totalYear,
       placed,
       missing: Math.max(0, required - placed),
       extra: Math.max(0, placed - required),
@@ -845,6 +906,27 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
   const summary = summarizeViolations(hardFromSchedules);
   const scheduleSummary = summarizeViolations(scheduleViolations);
 
+  let gdpt_weekly_warning = null;
+  const classIds = [...new Set(assignments.map((a) => a.class_id))];
+  const warnings = [];
+  for (const cid of classIds) {
+    const classRows = rows.filter((r) => r.class_id === cid);
+    const gradeLevel = classRows[0]?.grade_level;
+    const sumWeekly = classRows.reduce((s, r) => s + r.required, 0);
+    const w = computeGdptWeeklyWarning(gradeLevel, sumWeekly);
+    if (w) {
+      warnings.push({
+        ...w,
+        class_id: cid,
+        class_name: classRows[0]?.class_name,
+      });
+    }
+  }
+  if (warnings.length === 1 && class_id) gdpt_weekly_warning = warnings[0];
+  else if (warnings.length) gdpt_weekly_warning = warnings;
+
+  const weeklyApproxSubjects = rows.filter((r) => r.weekly_approximation);
+
   return {
     school_year,
     class_id: class_id || null,
@@ -864,6 +946,10 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
     violation_summary: summary,
     timetable: config,
     max_periods_per_session: MAX_PERIODS_PER_SESSION,
+    max_periods_per_day_class: MAX_PERIODS_PER_DAY_CLASS,
+    period_duration_minutes: config.period_duration_minutes ?? 45,
+    gdpt_weekly_warning,
+    weekly_approximation_subjects: weeklyApproxSubjects,
   };
 };
 
@@ -939,6 +1025,7 @@ module.exports = {
   releaseSlot,
   MAX_PERIODS_PER_WEEK,
   MAX_PERIODS_PER_SESSION,
+  MAX_PERIODS_PER_DAY_CLASS,
   collectCurriculumMismatches,
   validateAssignmentAgainstCurriculum: scheduling.validateAssignmentAgainstCurriculum,
   SCHEDULE_DAYS,
