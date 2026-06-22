@@ -3,7 +3,7 @@ import { cn } from '../../utils/cn';
 export function Card({ className = '', children, ...props }) {
   return (
     <div
-      className={cn('bg-white rounded-card border border-slate-200 shadow-card', className)}
+      className={cn('app-panel', className)}
       {...props}
     >
       {children}
@@ -16,7 +16,7 @@ export function CardHeader({ title, description, actions, className = '' }) {
     <div className={cn('px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2', className)}>
       <div>
         {title && <h2 className="text-h2">{title}</h2>}
-        {description && <p className="text-caption mt-0.5">{description}</p>}
+        {description && <p className="text-body mt-1">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2 shrink-0">{actions}</div>}
     </div>

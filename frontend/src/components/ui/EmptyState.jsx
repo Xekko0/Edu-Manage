@@ -13,9 +13,11 @@ export default function EmptyState({
   const displayDesc = message && !description ? message : desc;
   return (
     <div className={cn('py-12 px-6 text-center', className)}>
-      <Inbox className="w-12 h-12 mx-auto mb-3 text-slate-300" aria-hidden />
-      <p className="text-sm font-medium text-slate-700">{displayTitle}</p>
-      {displayDesc && <p className="text-caption mt-1 max-w-md mx-auto">{displayDesc}</p>}
+      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+        <Inbox className="w-6 h-6 text-slate-400" aria-hidden />
+      </div>
+      <p className="text-sm font-semibold text-ink">{displayTitle}</p>
+      {displayDesc && <p className="text-body mt-1 max-w-md mx-auto">{displayDesc}</p>}
       {children && <div className="mt-4">{children}</div>}
     </div>
   );

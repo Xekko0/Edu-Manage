@@ -1,5 +1,6 @@
 import { Inbox } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import { SkeletonLine } from './Skeleton';
 
 /**
  * @param {{ key: string, label: string, render?: (row) => React.ReactNode, className?: string }[]} columns
@@ -14,7 +15,11 @@ export default function DataTable({
 }) {
   if (loading) {
     return (
-      <div className="py-12 text-center text-caption">Đang tải…</div>
+      <div className="space-y-2 p-4">
+        <SkeletonLine height="40px" />
+        <SkeletonLine height="40px" />
+        <SkeletonLine height="40px" />
+      </div>
     );
   }
 
@@ -29,13 +34,13 @@ export default function DataTable({
 
   return (
     <div className={cn('overflow-x-auto -mx-5 sm:mx-0', className)}>
-      <table className="w-full text-sm min-w-[480px]">
+      <table className="w-full text-sm min-w-[560px]">
         <thead>
           <tr className="bg-slate-50 border-y border-slate-200">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={cn('px-4 py-3 text-left font-semibold text-slate-600', col.className)}
+                className={cn('px-4 py-3 text-left text-xs font-semibold uppercase text-ink-soft', col.className)}
               >
                 {col.label}
               </th>
@@ -46,10 +51,10 @@ export default function DataTable({
           {data.map((row, idx) => (
             <tr
               key={row[keyField] ?? idx}
-              className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors"
+              className="border-b border-slate-100 hover:bg-teal-50/40 transition-colors"
             >
               {columns.map((col) => (
-                <td key={col.key} className={cn('px-4 py-3 text-slate-800', col.className)}>
+                <td key={col.key} className={cn('px-4 py-3 text-ink align-middle', col.className)}>
                   {col.render ? col.render(row) : row[col.key]}
                 </td>
               ))}

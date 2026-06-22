@@ -7,33 +7,44 @@
 @layer base {
   :root {
     --color-primary: 13 148 136;
-    --color-surface: 248 250 252;
-    --radius-card: 0.75rem;
+    --color-surface: 246 247 249;
+    --radius-card: 0.5rem;
   }
 
   body {
-    @apply font-sans text-slate-800 antialiased bg-surface;
+    @apply font-sans text-ink antialiased bg-surface;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    @apply bg-teal-100 text-teal-950;
   }
 }
 
 @layer components {
   .text-display {
-    @apply text-3xl font-bold tracking-tight text-slate-900;
+    @apply text-3xl font-bold text-ink;
   }
   .text-h1 {
-    @apply text-2xl font-bold text-slate-900;
+    @apply text-2xl font-semibold text-ink;
   }
   .text-h2 {
-    @apply text-lg font-semibold text-slate-800;
+    @apply text-lg font-semibold text-ink;
   }
   .text-body {
-    @apply text-sm text-slate-700;
+    @apply text-sm text-ink-muted;
   }
   .text-caption {
-    @apply text-xs text-slate-500;
+    @apply text-xs text-ink-soft;
   }
   .focus-ring {
-    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2;
+    @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+  }
+  .app-panel {
+    @apply bg-white border border-slate-200 shadow-card rounded-card;
+  }
+  .app-section {
+    @apply bg-white border-y border-slate-200;
   }
 }
 
@@ -45,7 +56,7 @@
   width: 52px;
   height: 52px;
   border-radius: 9999px;
-  background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%);
+  background: #0d9488;
   color: white;
   display: flex;
   align-items: center;
@@ -64,7 +75,7 @@
   width: 320px;
   height: 480px;
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18);
   display: flex;
   flex-direction: column;

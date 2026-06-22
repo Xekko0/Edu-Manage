@@ -6,10 +6,10 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutDashboard, GraduationCap, BookOpen, DollarSign, Calendar,
+  LayoutDashboard, GraduationCap, BookOpen, Calendar,
   DoorOpen, Bell, Settings, ChevronLeft, ChevronRight, X,
   ClipboardCheck, Users, School, PenLine, NotebookPen, MessageSquare,
-  BarChart3, Wallet, FileText, Library, Sparkles, UserCheck, Home,
+  BarChart3, Wallet, FileText, UserCheck, Home,
 } from 'lucide-react';
 import { resolveNavPersona } from './navConfig';
 
@@ -172,36 +172,35 @@ export default function CollapsibleSidebar({ user, open, onClose, onExpandChange
   const sidebarContent = (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center justify-between px-3 py-4 border-b border-zinc-800">
+      <div className="flex items-center justify-between px-3 py-4 border-b border-slate-200">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-teal-500 flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-md bg-teal-600 flex items-center justify-center shrink-0 shadow-sm">
             <span className="text-white font-bold text-sm">E</span>
           </div>
-          <span className={`text-sm font-bold text-white truncate transition-opacity duration-200 ${showText ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
+          <span className={`text-sm font-bold text-ink truncate transition-opacity duration-200 ${showText ? 'opacity-100' : 'opacity-0 w-0 overflow-hidden'}`}>
             EduSmart
           </span>
         </div>
-        {/* Collapse button (desktop only) */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="hidden lg:flex p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+          className="hidden lg:flex p-1 rounded-md text-ink-soft hover:text-ink hover:bg-slate-100 transition-colors focus-ring"
+          aria-label={expanded ? 'Thu gọn menu' : 'Mở rộng menu'}
         >
           {expanded ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
         </button>
-        {/* Close button (mobile only) */}
         <button
           onClick={onClose}
-          className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-white"
+          className="lg:hidden p-1 rounded-md text-ink-soft hover:text-ink hover:bg-slate-100 focus-ring"
+          aria-label="Đóng menu"
         >
           <X size={16} />
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
         {categories.map((cat) => (
           <div key={cat.label}>
-            <div className={`px-3 mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 transition-opacity duration-200 ${showText ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
+            <div className={`px-3 mb-2 text-[10px] font-semibold uppercase text-ink-soft transition-opacity duration-200 ${showText ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
               {cat.label}
             </div>
             <div className="space-y-0.5">
@@ -213,8 +212,8 @@ export default function CollapsibleSidebar({ user, open, onClose, onExpandChange
                   className={({ isActive }) =>
                     `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group ${
                       isActive
-                        ? 'bg-indigo-500/20 text-indigo-300'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                        ? 'bg-teal-50 text-teal-800 ring-1 ring-teal-100'
+                        : 'text-ink-muted hover:text-ink hover:bg-slate-100'
                     }`
                   }
                   title={!showText ? item.label : undefined}
@@ -230,13 +229,12 @@ export default function CollapsibleSidebar({ user, open, onClose, onExpandChange
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-zinc-800 p-3">
+      <div className="border-t border-slate-200 p-3">
         <NavLink
           to="/profile"
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
-              isActive ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+              isActive ? 'bg-slate-100 text-ink' : 'text-ink-muted hover:text-ink hover:bg-slate-100'
             }`
           }
         >
@@ -253,7 +251,7 @@ export default function CollapsibleSidebar({ user, open, onClose, onExpandChange
     <>
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col fixed top-0 left-0 h-full bg-zinc-900 border-r border-zinc-800 z-40 transition-all duration-300 ${
+        className={`hidden lg:flex flex-col fixed top-0 left-0 h-full bg-white border-r border-slate-200 shadow-nav z-40 transition-all duration-300 ${
           expanded ? 'w-56' : 'w-16'
         }`}
       >
@@ -264,7 +262,7 @@ export default function CollapsibleSidebar({ user, open, onClose, onExpandChange
       {open && (
         <div className="lg:hidden fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-          <aside className="absolute left-0 top-0 h-full w-64 bg-zinc-900 shadow-xl">
+          <aside className="absolute left-0 top-0 h-full w-64 bg-white shadow-xl">
             {sidebarContent}
           </aside>
         </div>

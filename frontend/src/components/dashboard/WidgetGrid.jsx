@@ -106,7 +106,7 @@ export default function WidgetGrid({ userId, widgets = [], defaultLayout = [] })
         return (
           <div
             key={item.id}
-            className={`${sizeClass(item.size)} bg-white rounded-lg border shadow-sm transition-all ${
+            className={`${sizeClass(item.size)} app-panel overflow-hidden transition-all ${
               dragging === idx ? 'opacity-50 ring-2 ring-teal-400' : ''
             }`}
             draggable
@@ -115,31 +115,31 @@ export default function WidgetGrid({ userId, widgets = [], defaultLayout = [] })
             onDragEnd={handleDragEnd}
           >
             {/* Widget Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b bg-slate-50 rounded-t-lg cursor-grab active:cursor-grabbing">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50/70 cursor-grab active:cursor-grabbing">
               <div className="flex items-center gap-2 min-w-0">
-                <GripVertical size={14} className="text-slate-300 shrink-0" />
-                {widget.icon && <widget.icon size={16} className="text-teal-500 shrink-0" />}
-                <h3 className="text-sm font-semibold text-slate-700 truncate">{widget.title}</h3>
+                <GripVertical size={14} className="text-slate-300 shrink-0" aria-hidden />
+                {widget.icon && <widget.icon size={16} className="text-teal-600 shrink-0" aria-hidden />}
+                <h3 className="text-sm font-semibold text-ink truncate">{widget.title}</h3>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={() => cycleSize(idx)}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-400"
-                  title="Đổi kích thước"
+                  className="p-1 rounded-md text-ink-soft hover:bg-white hover:text-ink focus-ring"
+                  aria-label="Đổi kích thước widget"
                 >
                   {isCollapsed ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
                 </button>
                 <button
                   onClick={() => toggleCollapse(item.id)}
-                  className="p-1 hover:bg-slate-200 rounded text-slate-400"
-                  title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}
+                  className="p-1 rounded-md text-ink-soft hover:bg-white hover:text-ink focus-ring"
+                  aria-label={isCollapsed ? 'Mở rộng widget' : 'Thu gọn widget'}
                 >
                   {isCollapsed ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
                 </button>
                 <button
                   onClick={() => removeWidget(idx)}
-                  className="p-1 hover:bg-red-100 rounded text-slate-400 hover:text-red-500"
-                  title="Xóa widget"
+                  className="p-1 rounded-md text-ink-soft hover:bg-rose-50 hover:text-rose-600 focus-ring"
+                  aria-label="Ẩn widget"
                 >
                   <X size={12} />
                 </button>

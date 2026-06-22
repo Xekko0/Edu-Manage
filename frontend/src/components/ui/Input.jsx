@@ -18,7 +18,8 @@ export default function Input({
       id={inputId}
       className={cn(
         'w-full px-3 py-2 border rounded-lg text-sm bg-white transition-colors focus-ring',
-        error ? 'border-rose-400' : 'border-slate-300 focus:border-primary',
+        'placeholder:text-slate-400 min-h-[40px]',
+        error ? 'border-rose-400 bg-rose-50/40' : 'border-slate-300 focus:border-primary hover:border-slate-400',
         className,
       )}
       aria-invalid={!!error}
