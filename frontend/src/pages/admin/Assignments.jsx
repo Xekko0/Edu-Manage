@@ -6,8 +6,9 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Select from '../../components/ui/Select';
 import Input from '../../components/ui/Input';
-import Spinner from '../../components/ui/Spinner';
-import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody, CardHeader } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
 import {
   listAssignments,
   createAssignment,
@@ -139,49 +140,48 @@ export default function Assignments() {
   return (
     <div>
       <PageHeader title="Phân công Giáo viên Bộ môn">
-        <Button onClick={() => setModalOpen(true)}>+ Phân công mới</Button>
+        <Button onClick={() => setModalOpen(true)}>Phân công mới</Button>
       </PageHeader>
 
-      <p className="text-sm text-slate-600 mb-4">
-        Gán GVBM theo học kỳ (0 = cả năm). Môn chỉ học một kỳ (vd. Sử HK1/HK2) tạo hai phân công riêng.
-      </p>
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : !items.length ? (
-        <EmptyState message="Chưa có phân công nào." />
-      ) : (
-        <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="px-3 py-2 text-left">Giáo viên</th>
-                <th className="px-3 py-2 text-left">Lớp</th>
-                <th className="px-3 py-2 text-left">Môn</th>
-                <th className="px-3 py-2 text-left">Năm học</th>
-                <th className="px-3 py-2 text-center">Học kỳ</th>
-                <th className="px-3 py-2 text-center">Tiết/tuần</th>
-                <th className="px-3 py-2 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2">{row.teacher?.full_name}</td>
-                  <td className="px-3 py-2 font-medium">{row.class?.name}</td>
-                  <td className="px-3 py-2">{row.subject?.name}</td>
-                  <td className="px-3 py-2">{row.school_year}</td>
-                  <td className="px-3 py-2 text-center">{semesterLabel(row.semester ?? 0)}</td>
-                  <td className="px-3 py-2 text-center font-medium">{row.periods_per_week ?? 2}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Hủy</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Card>
+        <CardHeader
+          title="Danh sách phân công"
+          description="Gán GVBM theo lớp, môn, học kỳ và số tiết/tuần để phục vụ xếp thời khóa biểu."
+        />
+        <CardBody className="!p-0 sm:!p-0">
+          <DataTable
+            loading={loading}
+            columns={[
+              { key: 'teacher', label: 'Giáo viên', render: (row) => <span className="font-semibold">{row.teacher?.full_name}</span> },
+              { key: 'class', label: 'Lớp', render: (row) => <Badge color="teal">{row.class?.name}</Badge> },
+              { key: 'subject', label: 'Môn', render: (row) => row.subject?.name },
+              { key: 'year', label: 'Năm học', render: (row) => <span className="text-ink-muted">{row.school_year}</span> },
+              {
+                key: 'semester',
+                label: 'Học kỳ',
+                className: 'text-center',
+                render: (row) => semesterLabel(row.semester ?? 0),
+              },
+              {
+                key: 'periods',
+                label: 'Tiết/tuần',
+                className: 'text-center',
+                render: (row) => <span className="font-semibold tabular-nums">{row.periods_per_week ?? 2}</span>,
+              },
+              {
+                key: 'actions',
+                label: 'Thao tác',
+                className: 'text-right',
+                render: (row) => (
+                  <Button size="sm" variant="danger" onClick={() => handleDelete(row)}>Hủy</Button>
+                ),
+              },
+            ]}
+            data={items}
+            emptyMessage="Chưa có phân công nào."
+          />
+        </CardBody>
+      </Card>
 
       <Modal open={modalOpen} title="Phân công GVBM" onClose={() => setModalOpen(false)}>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -225,9 +225,13 @@ export default function Assignments() {
         </form>
       </Modal>
 
-      <section className="mt-8 p-4 bg-slate-50 border rounded-lg">
-        <h2 className="text-sm font-semibold mb-2">Lịch bận giáo viên (ràng buộc cứng khi xếp TKB)</h2>
-        <div className="flex flex-wrap gap-2 items-end mb-3 text-sm">
+      <Card className="mt-6">
+        <CardHeader
+          title="Lịch bận giáo viên"
+          description="Ràng buộc cứng khi hệ thống tự động xếp thời khóa biểu."
+        />
+        <CardBody>
+        <div className="flex flex-wrap gap-2 items-end mb-4 text-sm">
           <Select
             label="GV"
             value={unavailForm.teacher_id}
@@ -289,11 +293,11 @@ export default function Assignments() {
           </Button>
         </div>
         {unavail.length === 0 ? (
-          <p className="text-xs text-slate-500">Chưa có lịch bận.</p>
+          <p className="text-caption">Chưa có lịch bận.</p>
         ) : (
-          <ul className="text-sm space-y-1">
+          <ul className="text-sm divide-y divide-slate-100 rounded-md border border-slate-200 bg-white">
             {unavail.map((u) => (
-              <li key={u.id} className="flex justify-between items-center border-b py-1">
+              <li key={u.id} className="flex justify-between items-center gap-3 px-3 py-2">
                 <span>
                   {u.teacher?.full_name || `GV #${u.teacher_id}`}
                   {' — '}
@@ -303,7 +307,7 @@ export default function Assignments() {
                 </span>
                 <button
                   type="button"
-                  className="text-red-600 text-xs"
+                  className="text-xs font-medium text-rose-600 hover:underline"
                   onClick={async () => {
                     const res = await removeTeacherUnavailability(u.id);
                     if (res?.success) { toast.success('Đã xóa'); load(); }
@@ -315,7 +319,8 @@ export default function Assignments() {
             ))}
           </ul>
         )}
-      </section>
+        </CardBody>
+      </Card>
     </div>
   );
 }

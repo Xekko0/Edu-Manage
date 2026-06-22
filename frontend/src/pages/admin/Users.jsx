@@ -6,8 +6,9 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import Spinner from '../../components/ui/Spinner';
-import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
 import RoleBadge from '../../components/ui/RoleBadge';
 import Pagination from '../../components/ui/Pagination';
 import usePagination from '../../hooks/usePagination';
@@ -126,51 +127,57 @@ export default function Users() {
           <option value="">Tất cả vai trò</option>
           {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
         </Select>
-        <Button onClick={openCreate}>+ Tài khoản mới</Button>
+        <Button onClick={openCreate}>Tài khoản mới</Button>
       </PageHeader>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : !items.length ? (
-        <EmptyState message="Không có tài khoản phù hợp." />
-      ) : (
-        <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm min-w-[800px]">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="px-3 py-2 text-left">Họ tên</th>
-                <th className="px-3 py-2 text-left">Email</th>
-                <th className="px-3 py-2 text-left">Vai trò</th>
-                <th className="px-3 py-2 text-left">Trạng thái</th>
-                <th className="px-3 py-2 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {slice.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{row.full_name}</td>
-                  <td className="px-3 py-2 text-slate-600">{row.email}</td>
-                  <td className="px-3 py-2"><RoleBadge role={row.role} /></td>
-                  <td className="px-3 py-2">
-                    <span className={`text-xs px-2 py-0.5 rounded ${row.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {row.is_active ? 'Hoạt động' : 'Vô hiệu'}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs space-x-2">
-                    <button type="button" className="text-brand hover:underline" onClick={() => openEdit(row)}>Sửa</button>
-                    <button type="button" className="text-slate-600 hover:underline" onClick={() => handleToggle(row)}>
+      <Card>
+        <CardBody className="!p-0 sm:!p-0">
+          <DataTable
+            loading={loading}
+            columns={[
+              {
+                key: 'name',
+                label: 'Người dùng',
+                render: (row) => (
+                  <div>
+                    <div className="font-semibold text-ink">{row.full_name}</div>
+                    <div className="text-caption">{row.phone || 'Chưa có SĐT'}</div>
+                  </div>
+                ),
+              },
+              { key: 'email', label: 'Email', render: (row) => <span className="text-ink-muted">{row.email}</span> },
+              { key: 'role', label: 'Vai trò', render: (row) => <RoleBadge role={row.role} /> },
+              {
+                key: 'status',
+                label: 'Trạng thái',
+                render: (row) => (
+                  <Badge color={row.is_active ? 'green' : 'red'}>
+                    {row.is_active ? 'Hoạt động' : 'Vô hiệu'}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'actions',
+                label: 'Thao tác',
+                className: 'text-right',
+                render: (row) => (
+                  <div className="inline-flex flex-wrap justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>Sửa</Button>
+                    <Button size="sm" variant="outline" onClick={() => handleToggle(row)}>
                       {row.is_active ? 'Khóa' : 'Mở'}
-                    </button>
-                    <button type="button" className="text-amber-600 hover:underline" onClick={() => handleReset(row)}>Reset MK</button>
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => handleReset(row)}>Reset</Button>
+                    <Button size="sm" variant="danger" onClick={() => handleDelete(row)}>Xóa</Button>
+                  </div>
+                ),
+              },
+            ]}
+            data={slice}
+            emptyMessage="Không có tài khoản phù hợp."
+          />
           <Pagination page={page} totalPages={totalPages} total={total} onPageChange={setPage} />
-        </div>
-      )}
+        </CardBody>
+      </Card>
 
       <Modal open={modalOpen} title={editing ? 'Sửa tài khoản' : 'Tạo tài khoản'} onClose={() => setModalOpen(false)} wide>
         <form onSubmit={handleSubmit} className="space-y-4">

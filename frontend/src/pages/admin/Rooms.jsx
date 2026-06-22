@@ -5,8 +5,10 @@ import PageHeader from '../../components/ui/PageHeader';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import Spinner from '../../components/ui/Spinner';
 import Modal from '../../components/ui/Modal';
+import Card, { CardBody, CardHeader } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
 import { listRooms, createRoom, updateRoom, removeRoom } from '../../api/room.api';
 import { ROOM_TYPE_LABEL } from '../../utils/labels';
 
@@ -92,46 +94,41 @@ export default function Rooms() {
   return (
     <div>
       <PageHeader title="Danh mục phòng học">
-        <Button onClick={openCreate}>+ Thêm phòng</Button>
+        <Button onClick={openCreate}>Thêm phòng</Button>
       </PageHeader>
 
-      <p className="text-sm text-slate-600 mb-4">
-        Phòng Lab, Tin học, Thể dục dùng khi sinh TKB môn đặc thù — không trùng khung giờ.
-      </p>
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : (
-        <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100">
-              <tr>
-                <th className="px-3 py-2 text-left">Mã</th>
-                <th className="px-3 py-2 text-left">Tên</th>
-                <th className="px-3 py-2 text-left">Loại</th>
-                <th className="px-3 py-2 text-center">Sức chứa</th>
-                <th className="px-3 py-2 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id} className={`border-t ${!row.is_active ? 'opacity-50' : ''}`}>
-                  <td className="px-3 py-2 font-mono text-xs">{row.code}</td>
-                  <td className="px-3 py-2">{row.name}</td>
-                  <td className="px-3 py-2">{ROOM_TYPE_LABEL[row.room_type] || row.room_type}</td>
-                  <td className="px-3 py-2 text-center">{row.capacity}</td>
-                  <td className="px-3 py-2 text-right space-x-2">
-                    <button type="button" className="text-brand hover:underline" onClick={() => openEdit(row)}>Sửa</button>
+      <Card>
+        <CardHeader
+          title="Phòng học và tài nguyên"
+          description="Phòng Lab, Tin học, Thể dục dùng khi sinh TKB môn đặc thù và kiểm tra trùng phòng."
+        />
+        <CardBody className="!p-0 sm:!p-0">
+          <DataTable
+            loading={loading}
+            columns={[
+              { key: 'code', label: 'Mã', render: (row) => <span className="font-mono text-xs">{row.code}</span> },
+              { key: 'name', label: 'Tên phòng', render: (row) => <span className="font-semibold">{row.name}</span> },
+              { key: 'type', label: 'Loại', render: (row) => <Badge color="blue">{ROOM_TYPE_LABEL[row.room_type] || row.room_type}</Badge> },
+              { key: 'capacity', label: 'Sức chứa', className: 'text-center', render: (row) => <span className="font-semibold tabular-nums">{row.capacity}</span> },
+              {
+                key: 'actions',
+                label: 'Thao tác',
+                className: 'text-right',
+                render: (row) => (
+                  <div className="inline-flex justify-end gap-2 opacity-100">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>Sửa</Button>
                     {row.is_active && (
-                      <button type="button" className="text-red-600 hover:underline" onClick={() => handleHide(row)}>Ẩn</button>
+                      <Button size="sm" variant="danger" onClick={() => handleHide(row)}>Ẩn</Button>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                  </div>
+                ),
+              },
+            ]}
+            data={items}
+            emptyMessage="Chưa có phòng học."
+          />
+        </CardBody>
+      </Card>
 
       <Modal open={modalOpen} title={editId ? 'Sửa phòng' : 'Thêm phòng'} onClose={() => setModalOpen(false)}>
         <form onSubmit={handleSubmit} className="space-y-4">

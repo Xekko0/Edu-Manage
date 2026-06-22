@@ -6,8 +6,9 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import Spinner from '../../components/ui/Spinner';
-import EmptyState from '../../components/ui/EmptyState';
+import Card, { CardBody } from '../../components/ui/Card';
+import DataTable from '../../components/ui/DataTable';
+import Badge from '../../components/ui/Badge';
 import { listClasses, createClass, updateClass, removeClass } from '../../api/class.api';
 import { listUsers } from '../../api/user.api';
 import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
@@ -98,42 +99,35 @@ export default function Classes() {
           <option value={CURRENT_SCHOOL_YEAR}>{CURRENT_SCHOOL_YEAR}</option>
           <option value="2023-2024">2023-2024</option>
         </Select>
-        <Button onClick={openCreate}>+ Thêm lớp</Button>
+        <Button onClick={openCreate}>Thêm lớp</Button>
       </PageHeader>
 
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
-      ) : !items.length ? (
-        <EmptyState message="Chưa có lớp nào." />
-      ) : (
-        <div className="bg-white rounded-lg border overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-slate-100 text-slate-700">
-              <tr>
-                <th className="px-3 py-2 text-left">Tên lớp</th>
-                <th className="px-3 py-2 text-left">Khối</th>
-                <th className="px-3 py-2 text-left">Năm học</th>
-                <th className="px-3 py-2 text-left">GVCN</th>
-                <th className="px-3 py-2 text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((row) => (
-                <tr key={row.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{row.name}</td>
-                  <td className="px-3 py-2">Khối {row.grade_level}</td>
-                  <td className="px-3 py-2">{row.school_year}</td>
-                  <td className="px-3 py-2">{row.homeroomTeacher?.full_name || '—'}</td>
-                  <td className="px-3 py-2 text-right space-x-2">
-                    <button type="button" className="text-brand hover:underline" onClick={() => openEdit(row)}>Sửa</button>
-                    <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Xóa</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Card>
+        <CardBody className="!p-0 sm:!p-0">
+          <DataTable
+            loading={loading}
+            columns={[
+              { key: 'name', label: 'Tên lớp', render: (row) => <span className="font-semibold">{row.name}</span> },
+              { key: 'grade', label: 'Khối', render: (row) => <Badge color="teal">Khối {row.grade_level}</Badge> },
+              { key: 'year', label: 'Năm học', render: (row) => <span className="text-ink-muted">{row.school_year}</span> },
+              { key: 'teacher', label: 'GVCN', render: (row) => row.homeroomTeacher?.full_name || '—' },
+              {
+                key: 'actions',
+                label: 'Thao tác',
+                className: 'text-right',
+                render: (row) => (
+                  <div className="inline-flex justify-end gap-2">
+                    <Button size="sm" variant="ghost" onClick={() => openEdit(row)}>Sửa</Button>
+                    <Button size="sm" variant="danger" onClick={() => handleDelete(row)}>Xóa</Button>
+                  </div>
+                ),
+              },
+            ]}
+            data={items}
+            emptyMessage="Chưa có lớp nào."
+          />
+        </CardBody>
+      </Card>
 
       <Modal open={modalOpen} title={editing ? 'Sửa lớp' : 'Thêm lớp mới'} onClose={() => setModalOpen(false)}>
         <form onSubmit={handleSubmit} className="space-y-4">
