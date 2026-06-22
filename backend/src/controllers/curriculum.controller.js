@@ -44,6 +44,7 @@ const upsert = async (req, res) => {
       teaching_weeks,
       periods_per_week,
       is_required,
+      semester = 0,
     } = req.body;
     if (!grade_level || !subject_id) {
       return error(res, 'Thiếu grade_level hoặc subject_id', 400);
@@ -58,17 +59,21 @@ const upsert = async (req, res) => {
       periods_per_week,
     });
 
+    const sem = parseInt(semester, 10);
+    const semesterVal = Number.isNaN(sem) ? 0 : sem;
     let row = await CurriculumStandard.findOne({
       where: {
         school_year,
         grade_level: parseInt(grade_level, 10),
         subject_id: parseInt(subject_id, 10),
+        semester: semesterVal,
       },
     });
     const payload = {
       school_year,
       grade_level: parseInt(grade_level, 10),
       subject_id: parseInt(subject_id, 10),
+      semester: semesterVal,
       total_periods_per_year: derived.total_periods_per_year,
       teaching_weeks: derived.teaching_weeks,
       periods_per_week: derived.periods_per_week,
@@ -107,7 +112,7 @@ const lookupForClass = async (req, res) => {
     const school_year = parseSchoolYear(req);
     const grade_level = parseInt(req.query.grade_level, 10);
     if (!grade_level) return error(res, 'Thiếu grade_level', 400);
-    const items = await listCurriculumForGrade(school_year, grade_level);
+    const items = await listCurriculumForGrade(school_year, grade_level, req.query.semester);
     return success(res, items);
   } catch (err) {
     return error(res, 'Lỗi tra cứu khung CT', 500, err.message);

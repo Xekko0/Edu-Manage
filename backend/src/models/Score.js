@@ -23,6 +23,12 @@ const Score = sequelize.define('Score', {
   school_year: { type: DataTypes.STRING(9), allowNull: false },
   entered_by: { type: DataTypes.INTEGER, allowNull: false }, // user_id
   note: { type: DataTypes.STRING(255) },
+  status: {
+    type: DataTypes.ENUM('draft', 'published'),
+    allowNull: false,
+    defaultValue: 'draft',
+  },
+  published_at: { type: DataTypes.DATE },
 }, {
   tableName: 'scores',
   indexes: [

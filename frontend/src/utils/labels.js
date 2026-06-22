@@ -79,6 +79,7 @@ export const ROLE_LABEL = {
 
 export const ATTENDANCE_STATUS = {
   present: { label: 'Có mặt', color: 'bg-green-100 text-green-800' },
+  late: { label: 'Đi muộn', color: 'bg-blue-100 text-blue-800' },
   excused: { label: 'Vắng có phép', color: 'bg-amber-100 text-amber-800' },
   absent: { label: 'Vắng KP', color: 'bg-red-100 text-red-800' },
 };

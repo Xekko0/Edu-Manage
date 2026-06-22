@@ -1,9 +1,10 @@
-# EduSmart v1.1 — Hệ thống Quản lý Học sinh tích hợp AI Chatbot Widget
+# EDUSMART NEXT-GEN — Hệ thống Quản lý Thông tin & Học tập Thế hệ Mới
 
 > Dự án tiểu luận tốt nghiệp — Khoa Công nghệ Thông tin
-> Phạm vi: 1 sinh viên / 3 tháng (12 tuần)
+> Chuẩn tham chiếu: PowerSchool, Infinite Campus, Canvas LMS, Ellucian Banner
+> Triết lý: Dữ liệu tập trung — Quy trình tự động hóa — Chủ động hỗ trợ người học
 
-EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người dùng: **Admin / GVCN / GVBM / Phụ huynh / Học sinh**, tích hợp **AI Chatbot Widget** (floating bubble) cho cả 5 persona. GVCN = giáo viên `role=subject` được gán `classes.homeroom_teacher_id` (xem [PERMISSIONS.md](docs/PERMISSIONS.md), [FLOWS.md](docs/FLOWS.md)).
+EduSmart Next-Gen là nền tảng SaaS quản lý giáo dục phục vụ 5 nhóm người dùng: **Admin / GVCN / GVBM / Phụ huynh / Học sinh**, tích hợp **AI Chatbot Hybrid** (Gemini API + Qwen Local) và **Hệ thống Cảnh báo Sớm (EWS)**. Tài liệu đầy đủ: [PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md).
 
 ---
 
@@ -14,7 +15,7 @@ EduSmart là nền tảng web quản lý học sinh phục vụ 5 nhóm người
 - **Phân công GVBM** linh hoạt theo môn × lớp × năm học
 - **Lịch học, điểm danh** + cảnh báo email khi vắng không phép
 - **AI Chatbot Widget**: Floating bubble, popup 320×480, Quick Chips gợi ý, kết quả render ngay trong bubble (bảng điểm + nút Tải PDF inline)
-- **AI module-first**: Rules NLU → Tool dispatcher → DB tools; LLM chỉ `general_chat` / `ai_advice` (xem [AI_ARCHITECTURE.md](docs/AI_ARCHITECTURE.md))
+- **AI module-first**: Rules NLU → Tool dispatcher → DB tools; LLM chỉ `general_chat` / `ai_advice` (xem [PROJECT_SUMMARY.md §9](docs/PROJECT_SUMMARY.md#9-ai-chatbot-widget))
 - **Xuất PDF** học bạ, bảng điểm, báo cáo lớp
 - **Thông báo + email** Nodemailer SMTP
 
@@ -50,7 +51,7 @@ cd ../frontend && npm install
 cd backend
 cp .env.example .env
 # Mở .env và điền: DATABASE_URL, JWT_SECRET, (tuỳ chọn) ANTHROPIC_API_KEY hoặc GEMINI_API_KEY, SMTP_*
-# Chi tiết AI: docs/AI_SETUP.md · Module: docs/AI_CHAT_MODULE.md
+# Chi tiết AI: docs/PROJECT_SUMMARY.md#9-ai-chatbot-widget
 
 # Frontend
 cd ../frontend
@@ -78,7 +79,7 @@ npm run dev   # http://localhost:5173
 ```
 
 ### 6. Đăng nhập tài khoản mẫu
-Mật khẩu chung sau seed: **`edusmart123`** — chi tiết: [ACCOUNTS.md](docs/ACCOUNTS.md)
+Mật khẩu chung sau seed: **`edusmart123`** — chi tiết: [PROJECT_SUMMARY.md §11](docs/PROJECT_SUMMARY.md#11-tài-khoản-demo)
 
 | Vai trò | Email |
 | --- | --- |
@@ -120,7 +121,7 @@ edusmart/
 │   │   ├── api/           # axios + auth/score/chat
 │   │   └── store/         # authStore, chatStore (Zustand)
 │   └── index.html
-└── docs/            # SRS, FLOWS.md, UI_GUIDE.md, ACCOUNTS.md
+└── docs/            # PROJECT_SUMMARY.md (tài liệu tổng hợp)
 ```
 
 ---
@@ -187,9 +188,8 @@ User message
 
 ## Tài liệu liên quan
 
-- [`docs/EduSmart_SRS_v1.1.docx`](./docs/EduSmart_SRS_v1.1.docx) — Đặc tả yêu cầu phần mềm v1.1
-- [`docs/API_Collection.json`](./docs/API_Collection.json) — Postman collection
-- [`docs/ERD.png`](./docs/ERD.png) — Sơ đồ ERD
+- [`docs/PROJECT_SUMMARY.md`](./docs/PROJECT_SUMMARY.md) — Tài liệu tổng hợp toàn bộ dự án
+- [`docs/TIMETABLE_MODULE_SPEC.md`](./docs/TIMETABLE_MODULE_SPEC.md) — Đặc tả chi tiết module Thời khóa biểu (Data Model, Algorithm, API, UI, Workflows)
 
 ---
 

@@ -26,6 +26,8 @@ const curriculumRoutes = require('./src/routes/curriculum.routes');
 const roomRoutes = require('./src/routes/room.routes');
 const pushRoutes = require('./src/routes/push.routes');
 const { startScheduleReminderCron } = require('./jobs/schedule-reminder.job');
+const { startScoreLockCron } = require('./jobs/score-lock.job');
+const { startAttendanceAlertCron } = require('./jobs/attendance-alert.job');
 const attendanceRoutes = require('./src/routes/attendance.routes');
 const reportRoutes = require('./src/routes/report.routes');
 const notificationRoutes = require('./src/routes/notification.routes');
@@ -36,6 +38,15 @@ const tuitionRoutes = require('./src/routes/tuition.routes');
 const journalRoutes = require('./src/routes/journal.routes');
 const evaluationRoutes = require('./src/routes/evaluation.routes');
 const extracurricularRoutes = require('./src/routes/extracurricular.routes');
+const ewsRoutes = require('./src/routes/ews.routes');
+const competencyRoutes = require('./src/routes/competency.routes');
+const inviteRoutes = require('./src/routes/invite.routes');
+const searchRoutes = require('./src/routes/search.routes');
+const gradingPeriodRoutes = require('./src/routes/grading-period.routes');
+const icalRoutes = require('./src/routes/ical.routes');
+const financeRoutes = require('./src/routes/finance.routes');
+const examRoutes = require('./src/routes/exam.routes');
+const courseRegistrationRoutes = require('./src/routes/course-registration.routes');
 
 const app = express();
 
@@ -94,6 +105,18 @@ app.use('/api/tuitions', tuitionRoutes);
 app.use('/api/journals', journalRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/extracurriculars', extracurricularRoutes);
+app.use('/api/ews', ewsRoutes);
+app.use('/api/competencies', competencyRoutes);
+app.use('/api/invite', inviteRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/grading-periods', gradingPeriodRoutes);
+app.use('/api/ical', icalRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/exam', examRoutes);
+app.use('/api/courses', courseRegistrationRoutes);
+// Substitution endpoint mount trong schedules routes
+const substitutionCtrl = require('./src/controllers/substitution.controller');
+app.get('/api/schedules/:id/substitutes', require('./src/middleware/auth.middleware'), substitutionCtrl.getSubstitutes);
 
 // Global error handler — luôn trả JSON tiếng Việt
 app.use((err, _req, res, _next) => {
@@ -115,6 +138,8 @@ const PORT = env.PORT || 3001;
     const dialect = sequelize.getDialect();
     console.log(`[DB] Kết nối ${dialect.toUpperCase()} thành công`);
     startScheduleReminderCron();
+    startScoreLockCron();
+    startAttendanceAlertCron();
     app.listen(PORT, () => console.log(`[APP] EduSmart backend chạy trên cổng ${PORT}`));
   } catch (err) {
     console.error('[DB] Không kết nối được database:', err.message);

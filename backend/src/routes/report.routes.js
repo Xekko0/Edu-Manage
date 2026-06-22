@@ -10,5 +10,6 @@ router.use(auth);
 
 router.get('/class/:class_id/overview', role('admin', 'subject'), homeroom, ctrl.classOverview);
 router.get('/promotion-forecast', role('admin'), ctrl.promotionForecast);
+router.get('/promotion-forecast/:class_id', role('admin'), ctrl.promotionForecast);
 
 module.exports = router;

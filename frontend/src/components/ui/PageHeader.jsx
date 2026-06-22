@@ -6,7 +6,11 @@ export default function PageHeader({ title, description, children }) {
           <h1 className="text-h1">{title}</h1>
           {description && <p className="text-caption mt-1">{description}</p>}
         </div>
-        {children && <div className="flex flex-wrap gap-2 shrink-0">{children}</div>}
+        {children && (
+          <div className="flex flex-wrap gap-2 shrink-0 max-w-full min-w-0 justify-end">
+            {children}
+          </div>
+        )}
       </div>
     </div>
   );

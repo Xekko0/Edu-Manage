@@ -8,15 +8,28 @@ import Select from '../../components/ui/Select';
 import Input from '../../components/ui/Input';
 import Spinner from '../../components/ui/Spinner';
 import EmptyState from '../../components/ui/EmptyState';
-import { listAssignments, createAssignment, removeAssignment } from '../../api/assignment.api';
+import {
+  listAssignments,
+  createAssignment,
+  removeAssignment,
+  listTeacherUnavailability,
+  createTeacherUnavailability,
+  removeTeacherUnavailability,
+} from '../../api/assignment.api';
 import { listUsers } from '../../api/user.api';
 import { listClasses } from '../../api/class.api';
 import { listSubjects } from '../../api/subject.api';
 import { lookupCurriculum } from '../../api/curriculum.api';
-import { CURRENT_SCHOOL_YEAR } from '../../utils/labels';
+import { CURRENT_SCHOOL_YEAR, DAY_OF_WEEK } from '../../utils/labels';
+import { semesterLabel } from '../../utils/format';
 
 const emptyForm = {
-  teacher_id: '', class_id: '', subject_id: '', school_year: CURRENT_SCHOOL_YEAR, periods_per_week: '2',
+  teacher_id: '',
+  class_id: '',
+  subject_id: '',
+  school_year: CURRENT_SCHOOL_YEAR,
+  periods_per_week: '2',
+  semester: '0',
 };
 
 export default function Assignments() {
@@ -29,17 +42,23 @@ export default function Assignments() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [curriculumHint, setCurriculumHint] = useState(null);
+  const [unavail, setUnavail] = useState([]);
+  const [unavailForm, setUnavailForm] = useState({
+    teacher_id: '', day_of_week: '2', session: '', period: '', reason: '',
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [aRes, uRes, cRes, sRes] = await Promise.all([
+      const [aRes, uRes, cRes, sRes, unRes] = await Promise.all([
         listAssignments({ school_year: CURRENT_SCHOOL_YEAR }),
         listUsers(),
         listClasses({ school_year: CURRENT_SCHOOL_YEAR }),
         listSubjects(),
+        listTeacherUnavailability({ school_year: CURRENT_SCHOOL_YEAR }),
       ]);
       if (aRes?.success) setItems(aRes.data || []);
+      if (unRes?.success) setUnavail(unRes.data || []);
       if (uRes?.success) {
         setTeachers((uRes.data || []).filter((u) => u.role === 'subject'));
       }
@@ -65,14 +84,19 @@ export default function Assignments() {
       grade_level: cls.grade_level,
     })
       .then((res) => {
-        const row = (res?.data || []).find((r) => String(r.subject_id) === String(form.subject_id));
+        const sem = Number(form.semester) || 0;
+        const row = (res?.data || []).find((r) => {
+          if (String(r.subject_id) !== String(form.subject_id)) return false;
+          if (sem === 0) return r.semester === 0 || r.semester == null;
+          return r.semester === sem || r.semester === 0;
+        });
         if (row) {
           setCurriculumHint(row.periods_per_week);
           setForm((f) => ({ ...f, periods_per_week: String(row.periods_per_week) }));
         } else setCurriculumHint(null);
       })
       .catch(() => setCurriculumHint(null));
-  }, [form.class_id, form.subject_id, classes]);
+  }, [form.class_id, form.subject_id, form.semester, classes]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -87,6 +111,7 @@ export default function Assignments() {
         subject_id: Number(form.subject_id),
         school_year: form.school_year,
         periods_per_week: Number(form.periods_per_week),
+        semester: Number(form.semester),
       });
       if (res?.success) {
         toast.success('Phân công thành công');
@@ -118,7 +143,7 @@ export default function Assignments() {
       </PageHeader>
 
       <p className="text-sm text-slate-600 mb-4">
-        Gán GVBM vào môn × lớp × năm học. Quyền nhập điểm được kiểm tra qua bảng phân công.
+        Gán GVBM theo học kỳ (0 = cả năm). Môn chỉ học một kỳ (vd. Sử HK1/HK2) tạo hai phân công riêng.
       </p>
 
       {loading ? (
@@ -134,6 +159,7 @@ export default function Assignments() {
                 <th className="px-3 py-2 text-left">Lớp</th>
                 <th className="px-3 py-2 text-left">Môn</th>
                 <th className="px-3 py-2 text-left">Năm học</th>
+                <th className="px-3 py-2 text-center">Học kỳ</th>
                 <th className="px-3 py-2 text-center">Tiết/tuần</th>
                 <th className="px-3 py-2 text-right">Thao tác</th>
               </tr>
@@ -145,6 +171,7 @@ export default function Assignments() {
                   <td className="px-3 py-2 font-medium">{row.class?.name}</td>
                   <td className="px-3 py-2">{row.subject?.name}</td>
                   <td className="px-3 py-2">{row.school_year}</td>
+                  <td className="px-3 py-2 text-center">{semesterLabel(row.semester ?? 0)}</td>
                   <td className="px-3 py-2 text-center font-medium">{row.periods_per_week ?? 2}</td>
                   <td className="px-3 py-2 text-right">
                     <button type="button" className="text-red-600 hover:underline" onClick={() => handleDelete(row)}>Hủy</button>
@@ -165,6 +192,15 @@ export default function Assignments() {
           <Select label="Lớp" value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })} required>
             <option value="">— Chọn lớp —</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+          <Select
+            label="Học kỳ"
+            value={form.semester}
+            onChange={(e) => setForm({ ...form, semester: e.target.value })}
+          >
+            <option value="0">Cả năm</option>
+            <option value="1">Học kỳ 1</option>
+            <option value="2">Học kỳ 2</option>
           </Select>
           <Select label="Môn học" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} required>
             <option value="">— Chọn môn —</option>
@@ -188,6 +224,98 @@ export default function Assignments() {
           </div>
         </form>
       </Modal>
+
+      <section className="mt-8 p-4 bg-slate-50 border rounded-lg">
+        <h2 className="text-sm font-semibold mb-2">Lịch bận giáo viên (ràng buộc cứng khi xếp TKB)</h2>
+        <div className="flex flex-wrap gap-2 items-end mb-3 text-sm">
+          <Select
+            label="GV"
+            value={unavailForm.teacher_id}
+            onChange={(e) => setUnavailForm({ ...unavailForm, teacher_id: e.target.value })}
+            className="w-40"
+          >
+            <option value="">— Chọn —</option>
+            {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+          </Select>
+          <Select
+            label="Thứ"
+            value={unavailForm.day_of_week}
+            onChange={(e) => setUnavailForm({ ...unavailForm, day_of_week: e.target.value })}
+            className="w-28"
+          >
+            {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+              <option key={d} value={d}>{DAY_OF_WEEK[d]}</option>
+            ))}
+          </Select>
+          <Select
+            label="Buổi (trống = cả ngày)"
+            value={unavailForm.session}
+            onChange={(e) => setUnavailForm({ ...unavailForm, session: e.target.value })}
+            className="w-32"
+          >
+            <option value="">Cả ngày</option>
+            <option value="morning">Sáng</option>
+            <option value="afternoon">Chiều</option>
+          </Select>
+          <Input
+            label="Tiết (trống = cả buổi)"
+            type="number"
+            min={1}
+            max={5}
+            className="w-24"
+            value={unavailForm.period}
+            onChange={(e) => setUnavailForm({ ...unavailForm, period: e.target.value })}
+          />
+          <Button
+            type="button"
+            onClick={async () => {
+              if (!unavailForm.teacher_id) return toast.error('Chọn GV');
+              try {
+                const res = await createTeacherUnavailability({
+                  school_year: CURRENT_SCHOOL_YEAR,
+                  teacher_id: Number(unavailForm.teacher_id),
+                  day_of_week: Number(unavailForm.day_of_week),
+                  session: unavailForm.session || null,
+                  period: unavailForm.period ? Number(unavailForm.period) : null,
+                  reason: unavailForm.reason || null,
+                });
+                if (res?.success) { toast.success('Đã lưu'); load(); }
+              } catch (err) {
+                toast.error(err?.message || 'Lưu thất bại');
+              }
+            }}
+          >
+            Thêm
+          </Button>
+        </div>
+        {unavail.length === 0 ? (
+          <p className="text-xs text-slate-500">Chưa có lịch bận.</p>
+        ) : (
+          <ul className="text-sm space-y-1">
+            {unavail.map((u) => (
+              <li key={u.id} className="flex justify-between items-center border-b py-1">
+                <span>
+                  {u.teacher?.full_name || `GV #${u.teacher_id}`}
+                  {' — '}
+                  {DAY_OF_WEEK[u.day_of_week]}
+                  {u.session ? ` / ${u.session}` : ' / cả ngày'}
+                  {u.period ? ` tiết ${u.period}` : ''}
+                </span>
+                <button
+                  type="button"
+                  className="text-red-600 text-xs"
+                  onClick={async () => {
+                    const res = await removeTeacherUnavailability(u.id);
+                    if (res?.success) { toast.success('Đã xóa'); load(); }
+                  }}
+                >
+                  Xóa
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

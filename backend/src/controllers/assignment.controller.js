@@ -7,14 +7,19 @@ const {
   validateAssignmentAgainstCurriculum,
   syncAssignmentsFromCurriculum,
 } = require('../services/scheduling/curriculum');
+const { whereAssignmentForSemester } = require('../services/scheduling/semester');
 
 const list = async (req, res) => {
   try {
-    const { teacher_id, class_id, school_year } = req.query;
+    const { teacher_id, class_id, school_year, semester } = req.query;
     const where = { is_active: true };
     if (teacher_id) where.teacher_id = teacher_id;
     if (class_id) where.class_id = class_id;
     if (school_year) where.school_year = school_year;
+    if (semester !== undefined && semester !== '') {
+      const s = parseInt(semester, 10);
+      if (s === 1 || s === 2) Object.assign(where, whereAssignmentForSemester(s));
+    }
 
     const items = await TeacherAssignment.findAll({
       where,
@@ -44,18 +49,22 @@ const parsePeriodsPerWeek = (value) => {
 const create = async (req, res) => {
   try {
     const {
-      teacher_id, class_id, subject_id, school_year, periods_per_week, allow_override,
+      teacher_id, class_id, subject_id, school_year, periods_per_week, allow_override, semester = 0,
     } = req.body;
     const sy = school_year || process.env.CURRENT_SCHOOL_YEAR || '2024-2025';
     const periods = periods_per_week !== undefined
       ? parsePeriodsPerWeek(periods_per_week)
       : 2;
 
+    const sem = parseInt(semester, 10);
+    const semesterVal = Number.isNaN(sem) ? 0 : sem;
+
     await validateAssignmentAgainstCurriculum({
       class_id,
       subject_id,
       school_year: sy,
       periods_per_week: periods,
+      semester: semesterVal,
       allow_override: !!allow_override,
     });
 
@@ -65,6 +74,7 @@ const create = async (req, res) => {
       subject_id,
       school_year: sy,
       periods_per_week: periods,
+      semester: semesterVal,
     });
     return success(res, item, 'Phân công thành công', 201);
   } catch (err) {
@@ -102,7 +112,13 @@ const syncCurriculum = async (req, res) => {
       || req.query.school_year
       || process.env.CURRENT_SCHOOL_YEAR
       || '2024-2025';
-    const result = await syncAssignmentsFromCurriculum(school_year);
+    const arrangeSemester = req.body.semester != null
+      ? parseInt(req.body.semester, 10)
+      : null;
+    const result = await syncAssignmentsFromCurriculum(
+      school_year,
+      arrangeSemester === 1 || arrangeSemester === 2 ? arrangeSemester : null,
+    );
     const msg = result.curriculum_ok
       ? `Đã đồng bộ ${result.updated_count} phân công — khớp khung CT`
       : `Đã cập nhật ${result.updated_count} phân công; còn ${result.remaining_issues} lệch (thiếu khung CT môn)`;

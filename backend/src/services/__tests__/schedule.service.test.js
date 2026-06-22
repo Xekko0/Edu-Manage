@@ -4,6 +4,7 @@
 jest.mock('../../models', () => ({
   Schedule: {
     create: jest.fn(),
+    bulkCreate: jest.fn(),
     update: jest.fn(),
     findAll: jest.fn(),
     findOne: jest.fn(),
@@ -20,10 +21,12 @@ jest.mock('../../models', () => ({
   User: {},
   CurriculumStandard: { findOne: jest.fn(), findAll: jest.fn() },
   Room: { findAll: jest.fn() },
+  TeacherUnavailability: { findAll: jest.fn() },
 }));
 
 const {
   Schedule, TeacherAssignment, Class, TimetableConfig, Subject, CurriculumStandard, Room,
+  TeacherUnavailability,
 } = require('../../models');
 const scheduleService = require('../schedule.service');
 
@@ -44,8 +47,8 @@ beforeEach(() => {
   });
   Subject.findByPk.mockResolvedValue({ preferred_room_type: 'classroom', code: 'TOAN' });
   Room.findAll.mockResolvedValue([
-    { code: 'P10A1', name: 'Phòng 10A1', room_type: 'classroom', is_active: true },
-    { code: 'LAB1', name: 'Phòng Lab', room_type: 'lab', is_active: true },
+    { id: 1, code: 'P10A1', name: 'Phòng 10A1', room_type: 'classroom', is_active: true },
+    { id: 2, code: 'LAB1', name: 'Phòng Lab', room_type: 'lab', is_active: true },
   ]);
   CurriculumStandard.findOne.mockImplementation(({ where }) => Promise.resolve({
     periods_per_week: 2,
@@ -54,6 +57,7 @@ beforeEach(() => {
   }));
   CurriculumStandard.findAll.mockResolvedValue([]);
   Class.findAll.mockResolvedValue([]);
+  TeacherUnavailability.findAll.mockResolvedValue([]);
 });
 
 describe('schedule.service — buildSlotOrder + config', () => {
@@ -75,26 +79,39 @@ describe('schedule.service — buildSlotOrder + config', () => {
 describe('schedule.service — generateClassSchedule', () => {
   beforeEach(() => {
     let id = 1;
-    Schedule.create.mockImplementation((data) => Promise.resolve({ id: id++, ...data }));
+    Schedule.bulkCreate.mockImplementation((rows) => Promise.resolve(
+      rows.map((data) => ({ id: id++, ...data })),
+    ));
     Schedule.destroy.mockResolvedValue(0);
     Schedule.findAll.mockResolvedValue([]);
 
     Class.findByPk.mockResolvedValue({ id: 1, name: '10A1', grade_level: 10 });
     Class.findAll.mockResolvedValue([{ id: 1, name: '10A1', grade_level: 10, is_active: true }]);
     TeacherAssignment.findAll.mockResolvedValue([
-      { id: 10, teacher_id: 5, subject_id: 2, periods_per_week: 2, class_id: 1, subject: { name: 'Toán' } },
+      {
+        id: 10,
+        teacher_id: 5,
+        subject_id: 2,
+        periods_per_week: 2,
+        class_id: 1,
+        subject: { id: 2, code: 'TOAN', name: 'Toán', program_component: 'required_core' },
+        class: { id: 1, name: '10A1', grade_level: 10 },
+      },
     ]);
   });
 
-  test('sinh tiết từ phân công — gọi create', async () => {
+  test('sinh tiết từ phân công — solver bulkCreate', async () => {
     const result = await scheduleService.generateClassSchedule({
       class_id: 1,
       school_year: '2024-2025',
+      semester: 1,
       clearExisting: true,
     });
     expect(result.mode).toBe('generate');
     expect(result.created).toBe(2);
-    expect(Schedule.create).toHaveBeenCalledTimes(2);
+    expect(Schedule.bulkCreate).toHaveBeenCalled();
+    const rows = Schedule.bulkCreate.mock.calls[0][0];
+    expect(rows).toHaveLength(2);
   });
 });
 
@@ -130,43 +147,44 @@ describe('schedule.service — generateSchoolSchedule', () => {
   test('2 lớp cùng GV — không trùng khung giờ', async () => {
     const createdSlots = [];
     let scheduleId = 1;
-    Schedule.create.mockImplementation((data) => {
-      createdSlots.push({
-        class_id: data.class_id,
-        teacher_id: data.teacher_id,
-        day_of_week: data.day_of_week,
-        session: data.session,
-        period: data.period,
-      });
-      return Promise.resolve({ id: scheduleId++, ...data });
+    Schedule.bulkCreate.mockImplementation((rows) => {
+      for (const data of rows) {
+        createdSlots.push({
+          class_id: data.class_id,
+          teacher_id: data.teacher_id,
+          day_of_week: data.day_of_week,
+          session: data.session,
+          period: data.period,
+        });
+      }
+      return Promise.resolve(rows.map((data) => ({ id: scheduleId++, ...data })));
     });
     Schedule.destroy.mockResolvedValue(0);
     Schedule.findAll.mockResolvedValue([]);
 
     Class.findAll.mockResolvedValue([
-      { id: 1, name: '10A1', grade_level: 10 },
-      { id: 2, name: '10A2', grade_level: 10 },
+      { id: 1, name: '10A1', grade_level: 10, is_active: true },
+      { id: 2, name: '10A2', grade_level: 10, is_active: true },
     ]);
     Class.findByPk.mockImplementation((id) => Promise.resolve({
       id, name: id === 1 ? '10A1' : '10A2', grade_level: 10,
     }));
-    Class.findAll.mockResolvedValue([
-      { id: 1, name: '10A1', grade_level: 10, is_active: true },
-      { id: 2, name: '10A2', grade_level: 10, is_active: true },
+    TeacherAssignment.findAll.mockResolvedValue([
+      {
+        id: 10, teacher_id: 7, subject_id: 1, periods_per_week: 2, class_id: 1,
+        subject: { id: 1, code: 'TOAN', program_component: 'required_core' },
+        class: { id: 1, name: '10A1', grade_level: 10 },
+      },
+      {
+        id: 11, teacher_id: 7, subject_id: 1, periods_per_week: 2, class_id: 2,
+        subject: { id: 1, code: 'TOAN', program_component: 'required_core' },
+        class: { id: 2, name: '10A2', grade_level: 10 },
+      },
     ]);
-    TeacherAssignment.findAll.mockImplementation(({ where }) => {
-      if (where.class_id === 1) {
-        return Promise.resolve([
-          { id: 10, teacher_id: 7, subject_id: 1, periods_per_week: 2, class_id: 1 },
-        ]);
-      }
-      return Promise.resolve([
-        { id: 11, teacher_id: 7, subject_id: 1, periods_per_week: 2, class_id: 2 },
-      ]);
-    });
 
     await scheduleService.generateSchoolSchedule({
       school_year: '2024-2025',
+      semester: 1,
       clearExisting: true,
     });
 

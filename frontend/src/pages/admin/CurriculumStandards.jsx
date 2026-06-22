@@ -15,6 +15,7 @@ import {
 } from '../../api/curriculum.api';
 import { listSubjects } from '../../api/subject.api';
 import { CURRENT_SCHOOL_YEAR, PROGRAM_COMPONENT_LABEL } from '../../utils/labels';
+import { semesterLabel } from '../../utils/format';
 
 const GRADES = [10, 11, 12];
 const TEACHING_WEEKS = 35;
@@ -34,6 +35,7 @@ export default function CurriculumStandards() {
     total_periods_per_year: '105',
     teaching_weeks: String(TEACHING_WEEKS),
     is_required: true,
+    semester: '0',
   });
   const [saving, setSaving] = useState(false);
 
@@ -65,6 +67,7 @@ export default function CurriculumStandards() {
       total_periods_per_year: String(row.total_periods_per_year ?? row.periods_per_week * TEACHING_WEEKS),
       teaching_weeks: String(row.teaching_weeks || TEACHING_WEEKS),
       is_required: row.is_required !== false,
+      semester: String(row.semester ?? 0),
     });
     setModalOpen(true);
   };
@@ -81,6 +84,7 @@ export default function CurriculumStandards() {
         total_periods_per_year: Number(form.total_periods_per_year),
         teaching_weeks: Number(form.teaching_weeks) || TEACHING_WEEKS,
         is_required: form.is_required,
+        semester: Number(form.semester),
       });
       if (res?.success) {
         toast.success('Đã lưu');
@@ -119,6 +123,7 @@ export default function CurriculumStandards() {
             total_periods_per_year: '105',
             teaching_weeks: String(TEACHING_WEEKS),
             is_required: true,
+            semester: '0',
           });
           setModalOpen(true);
         }}
@@ -128,8 +133,7 @@ export default function CurriculumStandards() {
       </PageHeader>
 
       <p className="text-sm text-slate-600 mb-4">
-        Nhập <strong>tiết/năm</strong> và <strong>35 tuần</strong> thực học — hệ thống tính tiết/tuần (làm tròn) cho xếp TKB.
-        Môn ~1,5 tiết/tuần (vd. Sử 52/năm) sẽ hiển thị cảnh báo xấp xỉ đến Phase 2 (tuần chẵn/lẻ).
+        Nhập <strong>tiết/năm</strong> theo học kỳ. Môn cả năm chọn HK «Cả năm»; môn gộp theo kỳ (vd. Sử HK1: 2 tiết/tuần, HK2: 1) tạo <strong>hai dòng</strong> khung CT.
       </p>
 
       {loading ? (
@@ -142,6 +146,7 @@ export default function CurriculumStandards() {
             <thead className="bg-slate-100">
               <tr>
                 <th className="px-3 py-2 text-left">Môn</th>
+                <th className="px-3 py-2 text-center">Học kỳ</th>
                 <th className="px-3 py-2 text-center">Loại</th>
                 <th className="px-3 py-2 text-center">Tiết/năm</th>
                 <th className="px-3 py-2 text-center">Tuần</th>
@@ -154,6 +159,7 @@ export default function CurriculumStandards() {
               {items.map((row) => (
                 <tr key={row.id} className="border-t">
                   <td className="px-3 py-2">{row.subject?.name} ({row.subject?.code})</td>
+                  <td className="px-3 py-2 text-center text-xs">{semesterLabel(row.semester ?? 0)}</td>
                   <td className="px-3 py-2 text-center text-xs">
                     {PROGRAM_COMPONENT_LABEL[row.subject?.program_component] || row.subject?.program_component || '—'}
                   </td>
@@ -183,6 +189,15 @@ export default function CurriculumStandards() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <Select label="Khối" value={form.grade_level} onChange={(e) => setForm({ ...form, grade_level: e.target.value })}>
             {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+          </Select>
+          <Select
+            label="Học kỳ"
+            value={form.semester}
+            onChange={(e) => setForm({ ...form, semester: e.target.value })}
+          >
+            <option value="0">Cả năm (môn xuyên suốt)</option>
+            <option value="1">Học kỳ 1</option>
+            <option value="2">Học kỳ 2</option>
           </Select>
           <Select label="Môn" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} required>
             <option value="">— Chọn —</option>

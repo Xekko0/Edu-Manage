@@ -13,11 +13,11 @@ const bcrypt = require('bcrypt');
 module.exports = {
   async up(queryInterface) {
     const now = new Date();
-    const hashed = await bcrypt.hash('edusmart123', 10);
+    const hashed = await bcrypt.hash('Admin@123', 10);
 
     const users = [
       // Admin
-      { email: 'admin@edusmart.local', full_name: 'Nguyễn Văn Hiệu Trưởng', role: 'admin' },
+      { email: 'admin@edusmart.vn', full_name: 'Nguyễn Văn Hiệu Trưởng', role: 'admin' },
 
       // Giáo viên (có thể được gán làm GVCN qua bảng classes)
       { email: 'gvcn.10a1@edusmart.local', full_name: 'Trần Thị Lan (GV 10A1)', role: 'subject' },

@@ -41,6 +41,17 @@ const normalizeTimetableConfig = (row) => {
     grade_10_annual_periods: row?.grade_10_annual_periods ?? 1015,
     grade_11_annual_periods: row?.grade_11_annual_periods ?? 1032,
     grade_12_annual_periods: row?.grade_12_annual_periods ?? 1032,
+    semester1_start: row?.semester1_start || null,
+    semester1_end: row?.semester1_end || null,
+    semester2_start: row?.semester2_start || null,
+    semester2_end: row?.semester2_end || null,
+    holidays: row?.holidays || null,
+    morning_break_after_period: parseInt(row?.morning_break_after_period, 10) || 2,
+    morning_break_minutes: parseInt(row?.morning_break_minutes, 10) || 20,
+    afternoon_break_after_period: row?.afternoon_break_after_period != null
+      ? parseInt(row?.afternoon_break_after_period, 10)
+      : null,
+    afternoon_break_minutes: parseInt(row?.afternoon_break_minutes, 10) || 20,
     sessions,
     max_periods_per_session: MAX_PERIODS_PER_SESSION,
   };

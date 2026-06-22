@@ -14,11 +14,12 @@ const TeacherAssignment = sequelize.define('TeacherAssignment', {
   subject_id: { type: DataTypes.INTEGER, allowNull: false },
   school_year: { type: DataTypes.STRING(9), allowNull: false },
   periods_per_week: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 2 },
+  semester: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
   is_active: { type: DataTypes.BOOLEAN, defaultValue: true },
 }, {
   tableName: 'teacher_assignments',
   indexes: [
-    { unique: true, fields: ['teacher_id', 'class_id', 'subject_id', 'school_year'] },
+    { unique: true, fields: ['teacher_id', 'class_id', 'subject_id', 'school_year', 'semester'] },
     { fields: ['teacher_id'] },
     { fields: ['class_id', 'subject_id'] },
   ],

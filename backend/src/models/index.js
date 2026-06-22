@@ -24,6 +24,23 @@ const TimetableConfig = require('./TimetableConfig');
 const Room = require('./Room');
 const CurriculumStandard = require('./CurriculumStandard');
 const PushSubscription = require('./PushSubscription');
+const TeacherUnavailability = require('./TeacherUnavailability');
+const EWSRiskScore = require('./EWSRiskScore');
+const Competency = require('./Competency');
+const ScoreCompetencyTag = require('./ScoreCompetencyTag');
+const GradingPeriod = require('./GradingPeriod');
+const PendingAttendanceAlert = require('./PendingAttendanceAlert');
+const ScoreAuditLog = require('./ScoreAuditLog');
+const ExamPeriod = require('./ExamPeriod');
+const Assessment = require('./Assessment');
+const GradingScale = require('./GradingScale');
+const Transcript = require('./Transcript');
+const CourseEnrollment = require('./CourseEnrollment');
+const Invoice = require('./Invoice');
+const InvoiceItem = require('./InvoiceItem');
+const PaymentTransaction = require('./PaymentTransaction');
+const RoomAsset = require('./RoomAsset');
+const LibraryBorrow = require('./LibraryBorrow');
 
 // User ↔ Student (1-1)
 User.hasOne(Student, { foreignKey: 'user_id', as: 'studentProfile' });
@@ -56,6 +73,8 @@ TeacherAssignment.belongsTo(User, { foreignKey: 'teacher_id', as: 'teacher' });
 TeacherAssignment.belongsTo(Class, { foreignKey: 'class_id', as: 'class' });
 TeacherAssignment.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
 User.hasMany(TeacherAssignment, { foreignKey: 'teacher_id', as: 'assignments' });
+TeacherUnavailability.belongsTo(User, { foreignKey: 'teacher_id', as: 'teacher' });
+User.hasMany(TeacherUnavailability, { foreignKey: 'teacher_id', as: 'unavailability' });
 
 // Score
 Score.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
@@ -123,6 +142,69 @@ Student.hasMany(Evaluation, { foreignKey: 'student_id', as: 'evaluations' });
 CurriculumStandard.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
 Subject.hasMany(CurriculumStandard, { foreignKey: 'subject_id', as: 'curriculumStandards' });
 
+// EWS Risk Score
+EWSRiskScore.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Student.hasMany(EWSRiskScore, { foreignKey: 'student_id', as: 'riskScores' });
+
+// Competency ↔ Score (n-n qua ScoreCompetencyTag)
+Score.belongsToMany(Competency, { through: ScoreCompetencyTag, foreignKey: 'score_id', otherKey: 'competency_id', as: 'competencies' });
+Competency.belongsToMany(Score, { through: ScoreCompetencyTag, foreignKey: 'competency_id', otherKey: 'score_id', as: 'scores' });
+ScoreCompetencyTag.belongsTo(Score, { foreignKey: 'score_id', as: 'score' });
+ScoreCompetencyTag.belongsTo(Competency, { foreignKey: 'competency_id', as: 'competency' });
+
+// Pending Attendance Alert
+PendingAttendanceAlert.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+
+// === ERP: EXAM & GPA ENGINE ===
+
+// Score Audit Log
+ScoreAuditLog.belongsTo(Score, { foreignKey: 'score_id', as: 'score' });
+ScoreAuditLog.belongsTo(User, { foreignKey: 'modified_by', as: 'modifier' });
+Score.hasMany(ScoreAuditLog, { foreignKey: 'score_id', as: 'auditLogs' });
+
+// Assessment
+Assessment.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Assessment.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
+Assessment.belongsTo(Class, { foreignKey: 'class_id', as: 'class' });
+Assessment.belongsTo(ExamPeriod, { foreignKey: 'exam_period_id', as: 'examPeriod' });
+Assessment.belongsTo(User, { foreignKey: 'entered_by', as: 'enteredBy' });
+Student.hasMany(Assessment, { foreignKey: 'student_id', as: 'assessments' });
+
+// Transcript
+Transcript.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Student.hasMany(Transcript, { foreignKey: 'student_id', as: 'transcripts' });
+
+// Course Enrollment
+CourseEnrollment.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+CourseEnrollment.belongsTo(Subject, { foreignKey: 'subject_id', as: 'subject' });
+Student.hasMany(CourseEnrollment, { foreignKey: 'student_id', as: 'enrollments' });
+
+// === ERP: FINANCE LEDGER ===
+
+// Invoice
+Invoice.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Invoice.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+Student.hasMany(Invoice, { foreignKey: 'student_id', as: 'invoices' });
+Invoice.hasMany(InvoiceItem, { foreignKey: 'invoice_id', as: 'items' });
+Invoice.hasMany(PaymentTransaction, { foreignKey: 'invoice_id', as: 'payments' });
+
+// Invoice Item
+InvoiceItem.belongsTo(Invoice, { foreignKey: 'invoice_id', as: 'invoice' });
+
+// Payment Transaction
+PaymentTransaction.belongsTo(Invoice, { foreignKey: 'invoice_id', as: 'invoice' });
+PaymentTransaction.belongsTo(User, { foreignKey: 'approved_by', as: 'approver' });
+
+// === ERP: FACILITY & LIBRARY ===
+
+// Room Asset
+RoomAsset.belongsTo(Room, { foreignKey: 'room_id', as: 'room' });
+Room.hasMany(RoomAsset, { foreignKey: 'room_id', as: 'assets' });
+
+// Library Borrow
+LibraryBorrow.belongsTo(Student, { foreignKey: 'student_id', as: 'student' });
+Student.hasMany(LibraryBorrow, { foreignKey: 'student_id', as: 'libraryBorrows' });
+
 module.exports = {
   sequelize,
   User,
@@ -145,4 +227,21 @@ module.exports = {
   Room,
   CurriculumStandard,
   PushSubscription,
+  TeacherUnavailability,
+  EWSRiskScore,
+  Competency,
+  ScoreCompetencyTag,
+  GradingPeriod,
+  PendingAttendanceAlert,
+  ScoreAuditLog,
+  ExamPeriod,
+  Assessment,
+  GradingScale,
+  Transcript,
+  CourseEnrollment,
+  Invoice,
+  InvoiceItem,
+  PaymentTransaction,
+  RoomAsset,
+  LibraryBorrow,
 };

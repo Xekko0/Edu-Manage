@@ -12,12 +12,14 @@ const CurriculumStandard = sequelize.define('CurriculumStandard', {
   teaching_weeks: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 35 },
   periods_per_week: { type: DataTypes.INTEGER, allowNull: false },
   is_required: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+  /** 0 = cả năm; 1/2 = học kỳ (môn gộp HK1+HK2 như Sử 2+1 tiết/tuần). */
+  semester: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
 }, {
   tableName: 'curriculum_standards',
   underscored: true,
   paranoid: false,
   indexes: [
-    { unique: true, fields: ['school_year', 'grade_level', 'subject_id'] },
+    { unique: true, fields: ['school_year', 'grade_level', 'subject_id', 'semester'] },
   ],
 });
 

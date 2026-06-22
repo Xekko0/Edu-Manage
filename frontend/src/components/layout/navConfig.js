@@ -60,6 +60,7 @@ export const NAV_BY_PERSONA = {
         items: [
           { to: '/admin/tuitions', label: 'Học phí', icon: ICON.tuitions },
           { to: '/admin/reports', label: 'Báo cáo', icon: ICON.reports },
+          { to: '/admin/grading-periods', label: 'Kỳ chốt điểm', icon: ICON.attendance },
         ],
       },
       {
@@ -128,6 +129,7 @@ export const NAV_BY_PERSONA = {
         title: 'Gia đình',
         items: [
           { to: '/family', label: 'Tổng quan', icon: ICON.home, end: true },
+          { to: '/family/link-student', label: 'Liên kết con', icon: ICON.parents },
         ],
       },
       {
@@ -135,6 +137,7 @@ export const NAV_BY_PERSONA = {
         items: [
           { to: '/family/scores', label: 'Bảng điểm', icon: ICON.score },
           { to: '/family/gradebook', label: 'Học bạ', icon: ICON.subjects },
+          { to: '/family/competency', label: 'Năng lực', icon: ICON.reports },
           { to: '/family/evaluations', label: 'Đánh giá', icon: ICON.evaluations },
           { to: '/family/tuition', label: 'Học phí', icon: ICON.tuitions },
         ],
@@ -165,6 +168,7 @@ NAV_BY_PERSONA.student = {
       items: [
         { to: '/family/scores', label: 'Bảng điểm', icon: ICON.score },
         { to: '/family/gradebook', label: 'Học bạ', icon: ICON.subjects },
+        { to: '/family/competency', label: 'Năng lực', icon: ICON.reports },
         { to: '/family/evaluations', label: 'Đánh giá', icon: ICON.evaluations },
         { to: '/family/tuition', label: 'Học phí', icon: ICON.tuitions },
       ],

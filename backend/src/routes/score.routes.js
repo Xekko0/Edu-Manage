@@ -14,6 +14,9 @@ router.post('/', role('admin', 'subject'), assignment, ctrl.enter);
 router.post('/bulk', role('admin', 'subject'), assignment, ctrl.bulkEnter);
 router.put('/:id', role('admin', 'subject'), ctrl.update);
 
+// v2.0: Công bố điểm draft → published
+router.post('/publish', role('admin', 'subject'), ctrl.publishScores);
+
 // Xem điểm theo HS — PH/HS phải pass parent-link
 router.get('/student/:student_id', parentLink, ctrl.listByStudent);
 router.get('/student/:student_id/pdf', parentLink, ctrl.exportGradebookPDF);

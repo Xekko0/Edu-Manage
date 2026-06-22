@@ -3,7 +3,7 @@
  */
 const { Op } = require('sequelize');
 const {
-  Schedule, TeacherAssignment, Class, TimetableConfig, Subject, User,
+  Schedule, TeacherAssignment, Class, TimetableConfig, Subject, User, Room,
 } = require('../models');
 const scheduling = require('./scheduling');
 const {
@@ -34,6 +34,12 @@ const {
   MAX_PERIODS_PER_SESSION,
   MAX_PERIODS_PER_DAY_CLASS,
   PROGRAM_COMPONENT_ORDER,
+  parseArrangeSemester,
+  SEMESTER_HK1,
+  whereAssignmentForSemester,
+  whereScheduleForArrangeClear,
+  scheduleSemesterForRow,
+  solveSchoolSchedule,
 } = scheduling;
 
 const SCHEDULE_DAYS = [1, 2, 3, 4, 5, 6, 7];
@@ -109,6 +115,28 @@ const upsertTimetableConfig = async (school_year, patch) => {
     ...(patch.period_duration_minutes !== undefined
       ? { period_duration_minutes: Math.max(30, parseInt(patch.period_duration_minutes, 10) || 45) }
       : {}),
+    ...(patch.semester1_start !== undefined ? { semester1_start: patch.semester1_start || null } : {}),
+    ...(patch.semester1_end !== undefined ? { semester1_end: patch.semester1_end || null } : {}),
+    ...(patch.semester2_start !== undefined ? { semester2_start: patch.semester2_start || null } : {}),
+    ...(patch.semester2_end !== undefined ? { semester2_end: patch.semester2_end || null } : {}),
+    ...(patch.holidays !== undefined ? { holidays: patch.holidays } : {}),
+    ...(patch.morning_break_after_period !== undefined
+      ? { morning_break_after_period: Math.min(4, Math.max(1, parseInt(patch.morning_break_after_period, 10) || 2)) }
+      : {}),
+    ...(patch.morning_break_minutes !== undefined
+      ? { morning_break_minutes: Math.max(5, parseInt(patch.morning_break_minutes, 10) || 20) }
+      : {}),
+    ...(patch.afternoon_break_after_period !== undefined
+      ? {
+        afternoon_break_after_period: patch.afternoon_break_after_period === ''
+          || patch.afternoon_break_after_period == null
+          ? null
+          : Math.min(4, Math.max(1, parseInt(patch.afternoon_break_after_period, 10) || 2)),
+      }
+      : {}),
+    ...(patch.afternoon_break_minutes !== undefined
+      ? { afternoon_break_minutes: Math.max(5, parseInt(patch.afternoon_break_minutes, 10) || 20) }
+      : {}),
   };
 
   try {
@@ -129,13 +157,14 @@ const upsertTimetableConfig = async (school_year, patch) => {
 };
 
 const assertHardSlotFree = async ({
-  class_id, teacher_id, day_of_week, session, period, school_year, excludeId, room,
+  class_id, teacher_id, day_of_week, session, period, school_year, semester, excludeId, room,
 }) => {
   const base = {
     school_year,
     day_of_week,
     session,
     period,
+    ...(semester != null ? { semester } : {}),
     ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
   };
 
@@ -171,14 +200,14 @@ const assertHardSlotFree = async ({
     }
   }
 
-  const dayCount = await Schedule.count({
-    where: {
-      school_year,
-      class_id,
-      day_of_week,
-      ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
-    },
-  });
+  const dayWhere = {
+    school_year,
+    class_id,
+    day_of_week,
+    ...(semester != null ? { semester } : {}),
+    ...(excludeId ? { id: { [Op.ne]: excludeId } } : {}),
+  };
+  const dayCount = await Schedule.count({ where: dayWhere });
   if (dayCount >= MAX_PERIODS_PER_DAY_CLASS) {
     const err = new Error(
       `Lớp đã đạt tối đa ${MAX_PERIODS_PER_DAY_CLASS} tiết/ngày (GDPT 2018)`,
@@ -352,6 +381,7 @@ const placeAssignmentSlots = async ({
   classId,
   className,
   schoolYear,
+  arrangeSemester,
   busy,
   slotOrder,
   alreadyPlaced = 0,
@@ -406,9 +436,14 @@ const placeAssignmentSlots = async ({
       room: roomPick.roomName,
       room_id: roomPick.roomId,
       school_year: schoolYear,
+      semester: scheduleSemesterForRow(assignment.semester, arrangeSemester),
       program_component: programComponent,
     });
-    occupySlot(busy, classId, assignment.teacher_id, found, roomPick.roomName);
+    occupySlot(busy, classId, assignment.teacher_id, found, roomPick.roomName, {
+      subjectId: assignment.subject_id,
+      roomId: roomPick.roomId,
+      roomType: roomPick.roomType,
+    });
     created.push(row);
     placed += 1;
   }
@@ -511,124 +546,116 @@ const relocateConflictingSchedules = async ({
   };
 };
 
-const sumRequiredPeriodsForClass = (assignments, classRow, standardMap) =>
+const sumRequiredPeriodsForClass = (assignments, classRow, standardMap, arrangeSemester) =>
   assignments.reduce((s, a) => {
     const { required } = resolveRequiredPeriods(
       { ...(a.toJSON ? a.toJSON() : a), class: classRow },
       standardMap,
+      arrangeSemester,
     );
     return s + required;
   }, 0);
 
+const runSolver = async ({
+  school_year,
+  semester,
+  class_ids = null,
+  clearExisting = true,
+  runHillClimb = true,
+}) => {
+  const config = await getTimetableConfig(school_year);
+  return solveSchoolSchedule({
+    school_year,
+    semester,
+    class_ids,
+    timetableConfig: config,
+    clearExisting,
+    runHillClimb,
+  });
+};
+
 const generateClassSchedule = async ({
   class_id,
   school_year,
+  semester: semesterInput,
   clearExisting = true,
   busy: externalBusy = null,
 }) => {
-  const cls = await Class.findByPk(class_id);
-  if (!cls) {
-    const err = new Error('Không tìm thấy lớp');
-    err.status = 404;
-    throw err;
-  }
-
-  const config = await getTimetableConfig(school_year);
-  const slotOrder = buildSlotOrder(config);
-  const gridSlots = countGridSlots(config);
-
-  const curriculumIssues = await collectCurriculumMismatches(school_year, [class_id]);
-  if (curriculumIssues.length) {
-    const err = new Error('Phân công lớp chưa khớp khung chương trình theo khối');
-    err.status = 400;
-    err.code = 'CURRICULUM_BLOCK';
-    err.curriculum_issues = curriculumIssues;
-    throw err;
-  }
-
-  const assignmentsRaw = await TeacherAssignment.findAll({
-    where: { class_id, school_year, is_active: true },
-    include: [{
-      model: Subject,
-      as: 'subject',
-      attributes: ['id', 'code', 'name', 'program_component'],
-    }],
-  });
-  const assignments = sortAssignmentsByProgram(assignmentsRaw);
-  if (!assignments.length) {
-    const err = new Error('Lớp chưa có phân công giáo viên');
-    err.status = 400;
-    throw err;
-  }
-
-  const standardMap = await buildCurriculumStandardMap(school_year);
-  const required = sumRequiredPeriodsForClass(assignments, cls, standardMap);
-  if (required > gridSlots) {
-    const err = new Error(
-      `Cần ${required} tiết/tuần nhưng lưới chỉ có ${gridSlots} ô — giảm số tiết hoặc mở rộng khung giờ`,
-    );
-    err.status = 400;
-    throw err;
-  }
-
-  if (clearExisting) {
-    await Schedule.destroy({ where: { class_id, school_year }, force: true });
-  }
-
-  const busy = externalBusy || createBusyState();
-  if (!externalBusy) {
-    const existing = await Schedule.findAll({ where: { school_year } });
-    loadBusyFromSchedules(existing, busy);
-  }
-
-  const allCreated = [];
-  const allFailures = [];
-  let totalPlaced = 0;
-  let totalRequested = 0;
-
-  const placedByAssignment = new Map();
-  if (!clearExisting) {
-    const existingClass = await Schedule.findAll({ where: { class_id, school_year } });
-    for (const s of existingClass) {
-      const k = `${s.subject_id}|${s.teacher_id}`;
-      placedByAssignment.set(k, (placedByAssignment.get(k) || 0) + 1);
+  if (externalBusy) {
+    const arrangeSemester = semesterInput != null && semesterInput !== ''
+      ? parseArrangeSemester(semesterInput)
+      : SEMESTER_HK1;
+    const cls = await Class.findByPk(class_id);
+    if (!cls) {
+      const err = new Error('Không tìm thấy lớp');
+      err.status = 404;
+      throw err;
     }
-  }
-
-  for (const asn of assignments) {
-    const aKey = `${asn.subject_id}|${asn.teacher_id}`;
-    const { required: periodsPerWeek } = resolveRequiredPeriods(
-      { ...(asn.toJSON ? asn.toJSON() : asn), class: cls },
-      standardMap,
-    );
-    const result = await placeAssignmentSlots({
-      assignment: asn,
-      classId: class_id,
-      className: cls.name,
-      schoolYear: school_year,
-      busy,
-      slotOrder,
-      periodsPerWeek,
-      alreadyPlaced: clearExisting ? 0 : (placedByAssignment.get(aKey) || 0),
+    const config = await getTimetableConfig(school_year);
+    const slotOrder = buildSlotOrder(config);
+    const assignmentsRaw = await TeacherAssignment.findAll({
+      where: { class_id, school_year, is_active: true, ...whereAssignmentForSemester(arrangeSemester) },
+      include: [{ model: Subject, as: 'subject', attributes: ['id', 'code', 'name', 'program_component'] }],
     });
-    allCreated.push(...result.created);
-    allFailures.push(...result.failures);
-    totalPlaced += result.placed;
-    totalRequested += result.periodsRequested;
+    const assignments = sortAssignmentsByProgram(assignmentsRaw);
+    const standardMap = await buildCurriculumStandardMap(school_year, arrangeSemester);
+    const allCreated = [];
+    const allFailures = [];
+    let totalPlaced = 0;
+    let totalRequested = 0;
+    for (const asn of assignments) {
+      const { required: periodsPerWeek } = resolveRequiredPeriods(
+        { ...(asn.toJSON ? asn.toJSON() : asn), class: cls },
+        standardMap,
+        arrangeSemester,
+      );
+      const result = await placeAssignmentSlots({
+        assignment: asn,
+        classId: class_id,
+        className: cls.name,
+        schoolYear: school_year,
+        arrangeSemester,
+        busy: externalBusy,
+        slotOrder,
+        periodsPerWeek,
+        alreadyPlaced: 0,
+      });
+      allCreated.push(...result.created);
+      allFailures.push(...result.failures);
+      totalPlaced += result.placed;
+      totalRequested += result.periodsRequested;
+    }
+    return {
+      mode: 'generate',
+      semester: arrangeSemester,
+      class_id,
+      class_name: cls.name,
+      created: allCreated.length,
+      moved: 0,
+      periods_placed: totalPlaced,
+      periods_requested: totalRequested,
+      missing_periods: totalRequested - totalPlaced,
+      skipped: totalRequested - totalPlaced,
+      failures: allFailures,
+      grid_slots: countGridSlots(config),
+      maxPerWeek: MAX_PERIODS_PER_WEEK,
+    };
   }
 
+  const result = await runSolver({
+    school_year,
+    semester: semesterInput,
+    class_ids: [class_id],
+    clearExisting,
+  });
+  const cls = await Class.findByPk(class_id);
   return {
+    ...result,
     mode: 'generate',
     class_id,
-    class_name: cls.name,
-    created: allCreated.length,
+    class_name: cls?.name,
     moved: 0,
-    periods_placed: totalPlaced,
-    periods_requested: totalRequested,
-    missing_periods: totalRequested - totalPlaced,
-    skipped: totalRequested - totalPlaced,
-    failures: allFailures,
-    grid_slots: gridSlots,
+    skipped: result.missing_periods,
     maxPerWeek: MAX_PERIODS_PER_WEEK,
   };
 };
@@ -636,31 +663,74 @@ const generateClassSchedule = async ({
 /**
  * Tự động xếp lịch lớp: đồng bộ phân công theo khung CT, xóa hết tiết lớp, sinh lại, kiểm tra ràng buộc cứng.
  */
-const autoArrangeClassSchedule = async ({ class_id, school_year }) => {
-  const curriculum_sync = await syncAssignmentsFromCurriculum(school_year);
+const autoArrangeClassSchedule = async ({ class_id, school_year, semester }) => {
+  const arrangeSemester = parseArrangeSemester(semester);
+  const curriculum_sync = await syncAssignmentsFromCurriculum(school_year, arrangeSemester);
 
-  const result = await generateClassSchedule({
-    class_id,
+  const result = await runSolver({
     school_year,
+    semester: arrangeSemester,
+    class_ids: [class_id],
     clearExisting: true,
   });
 
-  const postVal = await getScheduleValidation({ school_year, class_id });
-  if (!postVal.hard_ok) {
+  const postVal = await getScheduleValidation({ school_year, class_id, semester: arrangeSemester });
+  if (!result.hard_ok || !postVal.hard_ok) {
     const err = new Error(
-      postVal.total_missing > 0
-        ? `Không xếp đủ tiết (còn thiếu ${postVal.total_missing}) — thử mở rộng khung giờ hoặc giảm tải GV`
+      postVal.total_missing > 0 || result.missing_periods > 0
+        ? `Không xếp đủ tiết (còn thiếu ${postVal.total_missing || result.missing_periods}) — thử mở rộng khung giờ hoặc giảm tải GV`
         : 'Sau xếp lịch vẫn còn vi phạm ràng buộc cứng (trùng lịch / khung CT)',
     );
     err.status = 400;
     err.code = 'POST_ARRANGE_HARD_FAIL';
     err.validation = postVal;
     err.curriculum_sync = curriculum_sync;
+    err.solver_result = result;
     throw err;
   }
 
   return {
     mode: 'auto_arrange',
+    curriculum_sync,
+    ...result,
+    class_id,
+    validation: postVal,
+    hard_ok: true,
+  };
+};
+
+const autoArrangeSchoolSchedule = async ({
+  school_year,
+  semester,
+  class_ids = null,
+}) => {
+  const arrangeSemester = parseArrangeSemester(semester);
+  const curriculum_sync = await syncAssignmentsFromCurriculum(school_year, arrangeSemester);
+
+  const result = await runSolver({
+    school_year,
+    semester: arrangeSemester,
+    class_ids,
+    clearExisting: true,
+  });
+
+  const postVal = await getSchoolScheduleValidation({ school_year });
+  if (!result.hard_ok || !postVal.hard_ok) {
+    const err = new Error(
+      result.missing_periods > 0
+        ? `Không xếp đủ tiết toàn trường (còn thiếu ${result.missing_periods})`
+        : 'Sau xếp toàn trường vẫn còn vi phạm ràng buộc cứng',
+    );
+    err.status = 400;
+    err.code = 'POST_ARRANGE_SCHOOL_FAIL';
+    err.validation = postVal;
+    err.curriculum_sync = curriculum_sync;
+    err.solver_result = result;
+    throw err;
+  }
+
+  return {
+    mode: 'auto_arrange_school',
     curriculum_sync,
     ...result,
     validation: postVal,
@@ -670,57 +740,23 @@ const autoArrangeClassSchedule = async ({ class_id, school_year }) => {
 
 const generateSchoolSchedule = async ({
   school_year,
+  semester: semesterInput,
   class_ids = null,
   clearExisting = true,
 }) => {
   const config = await getTimetableConfig(school_year);
-
-  const curriculumIssues = await collectCurriculumMismatches(school_year, class_ids);
-  if (curriculumIssues.length) {
-    const err = new Error('Phân công chưa khớp khung chương trình theo khối');
-    err.status = 400;
-    err.code = 'CURRICULUM_BLOCK';
-    err.curriculum_issues = curriculumIssues;
-    throw err;
-  }
-
-  if (clearExisting) {
-    await Schedule.destroy({ where: { school_year }, force: true });
-  }
-
-  const classWhere = { school_year, is_active: true };
-  if (class_ids?.length) {
-    classWhere.id = { [Op.in]: class_ids.map((id) => parseInt(id, 10)) };
-  }
-
-  const classes = await Class.findAll({
-    where: classWhere,
-    order: [['grade_level', 'ASC'], ['name', 'ASC']],
+  const result = await runSolver({
+    school_year,
+    semester: semesterInput ?? SEMESTER_HK1,
+    class_ids,
+    clearExisting,
   });
-
-  const busy = createBusyState();
-  const byClass = [];
-  let totalCreated = 0;
-
-  for (const cls of classes) {
-    const result = await generateClassSchedule({
-      class_id: cls.id,
-      school_year,
-      clearExisting: false,
-      busy,
-    });
-    byClass.push(result);
-    totalCreated += result.created;
-  }
-
   return {
+    ...result,
     mode: 'generate',
     school_year,
-    classes_processed: classes.length,
-    total_created: totalCreated,
-    created: totalCreated,
+    total_created: result.created,
     moved: 0,
-    by_class: byClass,
     timetable: config,
     maxPerWeek: MAX_PERIODS_PER_WEEK,
   };
@@ -826,12 +862,18 @@ const resolveConflictsSchedule = async ({ school_year, class_id = null }) => {
   return { mode: 'resolve', ...result, created: 0 };
 };
 
-const getScheduleValidation = async ({ school_year, class_id = null }) => {
+const getScheduleValidation = async ({ school_year, class_id = null, semester = null }) => {
   const config = await getTimetableConfig(school_year);
   const gridSlots = countGridSlots(config);
+  const viewSemester = semester != null && semester !== ''
+    ? parseArrangeSemester(semester)
+    : null;
 
   const assignWhere = { school_year, is_active: true };
   if (class_id) assignWhere.class_id = class_id;
+  if (viewSemester != null) {
+    Object.assign(assignWhere, whereAssignmentForSemester(viewSemester));
+  }
 
   const assignments = await TeacherAssignment.findAll({
     where: assignWhere,
@@ -845,18 +887,21 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
 
   const scheduleWhere = { school_year };
   if (class_id) scheduleWhere.class_id = class_id;
+  if (viewSemester != null) {
+    scheduleWhere.semester = viewSemester;
+  }
   const schedules = await Schedule.findAll({ where: scheduleWhere });
 
   const placedByKey = new Map();
   for (const s of schedules) {
-    const k = `${s.class_id}|${s.subject_id}|${s.teacher_id}`;
+    const k = `${s.class_id}|${s.subject_id}|${s.teacher_id}|${s.semester}`;
     placedByKey.set(k, (placedByKey.get(k) || 0) + 1);
   }
 
-  const standardMap = await buildCurriculumStandardMap(school_year);
+  const standardMap = await buildCurriculumStandardMap(school_year, viewSemester);
 
   const rows = assignments.map((a) => {
-    const resolved = resolveRequiredPeriods(a, standardMap);
+    const resolved = resolveRequiredPeriods(a, standardMap, viewSemester);
     const {
       required,
       curriculum_required: curriculumRequired,
@@ -866,10 +911,12 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
       exact_weekly_periods: exactWeekly,
       total_periods_per_year: totalYear,
     } = resolved;
-    const k = `${a.class_id}|${a.subject_id}|${a.teacher_id}`;
+    const rowSem = scheduleSemesterForRow(a.semester, viewSemester || 1);
+    const k = `${a.class_id}|${a.subject_id}|${a.teacher_id}|${rowSem}`;
     const placed = placedByKey.get(k) || 0;
     return {
       assignment_id: a.id,
+      semester: rowSem,
       class_id: a.class_id,
       class_name: a.class?.name,
       grade_level: a.class?.grade_level,
@@ -900,6 +947,7 @@ const getScheduleValidation = async ({ school_year, class_id = null }) => {
   const curriculumMismatches = await collectCurriculumMismatches(
     school_year,
     class_id ? [class_id] : null,
+    viewSemester,
   );
   const scheduleViolations = detectHardViolationsFromSchedules(schedules, {});
   const hardFromSchedules = [...scheduleViolations, ...curriculumMismatches];
@@ -979,17 +1027,100 @@ const getSchoolScheduleValidation = async ({ school_year }) => {
   };
 };
 
+const getScheduleReadiness = async ({ school_year, semester }) => {
+  const arrangeSemester = parseArrangeSemester(semester);
+  const [schoolVal, val, config, rooms, assignCount] = await Promise.all([
+    getSchoolScheduleValidation({ school_year }),
+    getScheduleValidation({ school_year, class_id: null, semester: arrangeSemester }),
+    getTimetableConfig(school_year),
+    Room.findAll({ where: { is_active: true }, attributes: ['id', 'room_type'] }),
+    TeacherAssignment.count({
+      where: { school_year, is_active: true, ...whereAssignmentForSemester(arrangeSemester) },
+    }),
+  ]);
+
+  const roomsByType = rooms.reduce((acc, r) => {
+    const t = r.room_type || 'classroom';
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+
+  const timetable_configured = Boolean(
+    config.days_of_week?.length
+    && (config.semester1_start || config.semester2_start),
+  );
+
+  const totalRequired = val.total_required || 0;
+  const totalPlaced = val.total_placed || 0;
+
+  const steps = [
+    {
+      id: 'curriculum',
+      label: 'Khung chương trình khối',
+      ok: schoolVal.curriculum_ok,
+      href: '/admin/curriculum',
+      detail: schoolVal.curriculum_ok
+        ? 'Phân công khớp khung CT'
+        : `${schoolVal.curriculum_issues?.length || 0} môn lệch khung CT`,
+    },
+    {
+      id: 'rooms',
+      label: 'Phòng học',
+      ok: rooms.length > 0,
+      href: '/admin/rooms',
+      detail: `${rooms.length} phòng active`,
+    },
+    {
+      id: 'assignments',
+      label: 'Phân công giáo viên',
+      ok: assignCount > 0,
+      href: '/admin/assignments',
+      detail: `${assignCount} phân công HK${arrangeSemester}`,
+    },
+    {
+      id: 'timetable',
+      label: 'Khung giờ & lịch HK',
+      ok: timetable_configured,
+      href: '/admin/schedules?tab=prepare',
+      detail: timetable_configured ? 'Đã cấu hình' : 'Chưa đặt mốc học kỳ / ngày dạy',
+    },
+    {
+      id: 'schedules',
+      label: 'Tiết đã xếp',
+      ok: totalRequired > 0 && totalPlaced >= totalRequired && schoolVal.hard_ok,
+      href: '/admin/schedules?tab=arrange',
+      detail: totalRequired > 0
+        ? `${totalPlaced}/${totalRequired} tiết (${Math.round((totalPlaced / totalRequired) * 100)}%)`
+        : 'Chưa có dữ liệu tiết cần xếp',
+    },
+  ];
+
+  return {
+    school_year,
+    semester: arrangeSemester,
+    curriculum_ok: schoolVal.curriculum_ok,
+    rooms_count: rooms.length,
+    rooms_by_type: roomsByType,
+    assignments_count: assignCount,
+    timetable_configured,
+    total_required: totalRequired,
+    total_placed: totalPlaced,
+    total_missing: val.total_missing || Math.max(0, totalRequired - totalPlaced),
+    schedules_placed_ratio: totalRequired > 0 ? totalPlaced / totalRequired : 0,
+    hard_ok: schoolVal.hard_ok,
+    ready_to_arrange: schoolVal.curriculum_ok && assignCount > 0 && timetable_configured,
+    steps,
+  };
+};
+
 const seedArrangeFromAssignments = async ({ school_year, clearExisting = true }) =>
   generateSchoolSchedule({ school_year, clearExisting });
 
 /** @deprecated Dùng generateClassSchedule */
 const autoArrangeClass = (opts) => generateClassSchedule({ ...opts, clearExisting: opts.clearExisting !== false });
 
-/** @deprecated Dùng repackSchoolSchedule / resolveConflictsSchedule */
-const autoArrangeSchool = async (opts) => {
-  if (opts.clearExisting) return repackSchoolSchedule(opts);
-  return resolveConflictsSchedule({ school_year: opts.school_year, class_id: null });
-};
+/** @deprecated — dùng autoArrangeSchoolSchedule */
+const autoArrangeSchool = (opts) => autoArrangeSchoolSchedule(opts);
 
 const SCHOOL_DAYS_AUTO = DEFAULT_TIMETABLE.days_of_week;
 
@@ -1007,12 +1138,14 @@ module.exports = {
   countGridSlots,
   generateClassSchedule,
   autoArrangeClassSchedule,
+  autoArrangeSchoolSchedule,
   generateSchoolSchedule,
   repackClassSchedule,
   repackSchoolSchedule,
   resolveConflictsSchedule,
   getScheduleValidation,
   getSchoolScheduleValidation,
+  getScheduleReadiness,
   seedArrangeFromAssignments,
   relocateConflictingSchedules,
   placeAssignmentSlots,

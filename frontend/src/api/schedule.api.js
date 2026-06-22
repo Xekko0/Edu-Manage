@@ -15,6 +15,9 @@ export const getScheduleValidation = (params = {}) =>
 export const getSchoolScheduleValidation = (params = {}) =>
   api.get('/schedules/validation-school', { params });
 
+export const getScheduleReadiness = (params = {}) =>
+  api.get('/schedules/readiness', { params });
+
 export const createSchedule = (data) => api.post('/schedules', data);
 
 export const updateSchedule = (id, data) => api.put(`/schedules/${id}`, data);
@@ -28,6 +31,10 @@ export const generateSchedule = (data) => api.post('/schedules/generate', data);
 /** Xóa hết tiết lớp + sinh lại theo khung CT — bắt buộc đạt ràng buộc cứng */
 export const autoArrangeClassSchedule = (data) => api.post('/schedules/auto-arrange', data);
 
+export const autoArrangeSchoolSchedule = (data) => api.post('/schedules/auto-arrange-school', data);
+
+export const listSchedulesByRoom = (params = {}) => api.get('/schedules/by-room', { params });
+
 export const generateSchoolSchedule = (data) => api.post('/schedules/generate-school', data);
 
 export const repackSchedule = (data) => api.post('/schedules/repack', data);
@@ -40,4 +47,4 @@ export const resolveScheduleConflicts = (data) => api.post('/schedules/resolve-c
 export const autoArrangeSchedules = generateSchedule;
 
 /** @deprecated */
-export const autoArrangeSchool = generateSchoolSchedule;
+export const autoArrangeSchool = autoArrangeSchoolSchedule;

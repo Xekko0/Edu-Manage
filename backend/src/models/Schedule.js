@@ -27,6 +27,7 @@ const Schedule = sequelize.define('Schedule', {
   lesson_topic: { type: DataTypes.STRING(200), allowNull: true },
   homework_reminder: { type: DataTypes.TEXT, allowNull: true },
   school_year: { type: DataTypes.STRING(9), allowNull: false },
+  semester: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
   program_component: { type: DataTypes.STRING(30), allowNull: true },
 }, {
   tableName: 'schedules',

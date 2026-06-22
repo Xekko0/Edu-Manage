@@ -21,6 +21,18 @@ const loadFullSchedule = (id) => Schedule.findByPk(id, { include: includeDetail 
 const parseSchoolYear = (req) =>
   req.query.school_year || req.body.school_year || process.env.CURRENT_SCHOOL_YEAR || '2024-2025';
 
+const {
+  parseArrangeSemester,
+  parseSemesterOptional,
+  whereScheduleForViewSemester,
+} = require('../services/scheduling/semester');
+
+const parseSemesterQuery = (req) => {
+  const raw = req.query.semester ?? req.body?.semester;
+  if (raw === undefined || raw === null || raw === '') return null;
+  return parseArrangeSemester(raw);
+};
+
 const list = async (req, res) => {
   try {
     const { class_id } = req.query;
@@ -47,8 +59,9 @@ const list = async (req, res) => {
       if (!ok) return error(res, 'Bạn chỉ xem được TKB lớp của con', 403);
     }
 
+    const semFilter = whereScheduleForViewSemester(req.query.semester);
     const items = await Schedule.findAll({
-      where: { class_id, school_year },
+      where: { class_id, school_year, ...semFilter },
       include: includeDetail,
       order: [['session', 'ASC'], ['day_of_week', 'ASC'], ['period', 'ASC']],
     });
@@ -111,8 +124,9 @@ const myClass = async (req, res) => {
       return error(res, 'Chỉ dành cho học sinh / phụ huynh', 403);
     }
 
+    const semFilter = whereScheduleForViewSemester(req.query.semester);
     const items = await Schedule.findAll({
-      where: { class_id, school_year },
+      where: { class_id, school_year, ...semFilter },
       include: includeDetail,
       order: [['session', 'ASC'], ['day_of_week', 'ASC'], ['period', 'ASC']],
     });
@@ -138,8 +152,9 @@ const myClass = async (req, res) => {
 const listMine = async (req, res) => {
   try {
     const school_year = parseSchoolYear(req);
+    const semFilter = whereScheduleForViewSemester(req.query.semester);
     const items = await Schedule.findAll({
-      where: { teacher_id: req.user.id, school_year },
+      where: { teacher_id: req.user.id, school_year, ...semFilter },
       include: includeDetail,
       order: [['session', 'ASC'], ['day_of_week', 'ASC'], ['period', 'ASC']],
     });
@@ -183,6 +198,7 @@ const validatePayload = async (body, excludeId, reqUser) => {
     await scheduleService.assertTeacherClassAccess(reqUser.id, class_id);
   }
   await scheduleService.assertTeacherAssignment(teacher_id, class_id, subject_id);
+  const semester = parseSemesterOptional(body.semester, 1);
   await scheduleService.assertHardSlotFree({
     class_id,
     teacher_id,
@@ -190,6 +206,7 @@ const validatePayload = async (body, excludeId, reqUser) => {
     session,
     period: parseInt(period, 10),
     school_year,
+    semester,
     excludeId,
     room: body.room,
   });
@@ -211,8 +228,10 @@ const create = async (req, res) => {
     const subject = await Subject.findByPk(req.body.subject_id, {
       attributes: ['program_component'],
     });
+    const semester = parseSemesterOptional(req.body.semester, 1);
     const item = await Schedule.create({
       ...req.body,
+      semester,
       program_component: subject?.program_component || null,
     });
     const full = await Schedule.findByPk(item.id, { include: includeDetail });
@@ -340,9 +359,10 @@ const remove = async (req, res) => {
   }
 };
 
-const loadClassItems = async (class_id, school_year) => {
+const loadClassItems = async (class_id, school_year, semester = null) => {
+  const semFilter = semester != null ? { semester } : {};
   const items = await Schedule.findAll({
-    where: { class_id, school_year },
+    where: { class_id, school_year, ...semFilter },
     include: includeDetail,
   });
   return scheduleService.annotateConflicts(items, school_year);
@@ -352,9 +372,11 @@ const validation = async (req, res) => {
   try {
     const sy = parseSchoolYear(req);
     const class_id = req.query.class_id ? parseInt(req.query.class_id, 10) : null;
+    const semester = req.query.semester != null ? parseArrangeSemester(req.query.semester) : null;
     const result = await scheduleService.getScheduleValidation({
       school_year: sy,
       class_id,
+      semester,
     });
     return success(res, result);
   } catch (err) {
@@ -369,6 +391,20 @@ const validationSchool = async (req, res) => {
     return success(res, result);
   } catch (err) {
     return error(res, err.message || 'Lỗi kiểm tra TKB toàn trường', err.status || 500);
+  }
+};
+
+const readiness = async (req, res) => {
+  try {
+    const sy = parseSchoolYear(req);
+    const semester = parseSemesterQuery(req) ?? 1;
+    const result = await scheduleService.getScheduleReadiness({
+      school_year: sy,
+      semester,
+    });
+    return success(res, result);
+  } catch (err) {
+    return error(res, err.message || 'Lỗi kiểm tra chuẩn bị TKB', err.status || 500);
   }
 };
 
@@ -474,15 +510,20 @@ const resolveConflicts = async (req, res) => {
 /** Alias cũ → sinh TKB lớp */
 const autoArrange = async (req, res) => {
   try {
-    const { class_id, school_year } = req.body;
+    const { class_id, school_year, semester } = req.body;
     if (!class_id) return error(res, 'Thiếu class_id', 400);
+    if (semester === undefined || semester === null || semester === '') {
+      return error(res, 'Chọn học kỳ (semester: 1 hoặc 2)', 400);
+    }
     const sy = school_year || parseSchoolYear(req);
     const cid = parseInt(class_id, 10);
+    const sem = parseArrangeSemester(semester);
     const result = await scheduleService.autoArrangeClassSchedule({
       class_id: cid,
       school_year: sy,
+      semester: sem,
     });
-    const items = await loadClassItems(cid, sy);
+    const items = await loadClassItems(cid, sy, sem);
     const synced = result.curriculum_sync?.updated_count || 0;
     const syncNote = synced > 0 ? ` (đã đồng bộ ${synced} phân công theo khung CT)` : '';
     return success(
@@ -499,16 +540,64 @@ const autoArrange = async (req, res) => {
     );
   }
 };
-/** Alias cũ → sinh toàn trường nếu clear_existing, không thì giải trùng */
+const listByRoom = async (req, res) => {
+  try {
+    const school_year = parseSchoolYear(req);
+    const room_id = parseInt(req.query.room_id, 10);
+    if (!room_id) return error(res, 'Thiếu room_id', 400);
+    const semFilter = whereScheduleForViewSemester(req.query.semester);
+    const items = await Schedule.findAll({
+      where: { school_year, room_id, ...semFilter },
+      include: includeDetail,
+      order: [['session', 'ASC'], ['day_of_week', 'ASC'], ['period', 'ASC']],
+    });
+    const annotated = await scheduleService.annotateConflicts(items, school_year);
+    return success(res, {
+      view: 'room',
+      room_id,
+      items: annotated,
+      maxPeriodsPerWeek: scheduleService.MAX_PERIODS_PER_WEEK,
+    });
+  } catch (err) {
+    return error(res, err.message || 'Lỗi tải TKB phòng', err.status || 500);
+  }
+};
+
 const autoArrangeSchool = async (req, res) => {
-  if (req.body?.clear_existing) return generateSchool(req, res);
-  return resolveConflicts(req, res);
+  try {
+    const { school_year, semester, class_ids } = req.body;
+    if (semester === undefined || semester === null || semester === '') {
+      return error(res, 'Chọn học kỳ (semester: 1 hoặc 2)', 400);
+    }
+    const sy = school_year || parseSchoolYear(req);
+    const sem = parseArrangeSemester(semester);
+    const result = await scheduleService.autoArrangeSchoolSchedule({
+      school_year: sy,
+      semester: sem,
+      class_ids: class_ids || null,
+    });
+    const synced = result.curriculum_sync?.updated_count || 0;
+    const syncNote = synced > 0 ? ` (đồng bộ ${synced} phân công)` : '';
+    return success(
+      res,
+      result,
+      `Đã xếp toàn trường HK${sem}: ${result.created} tiết — score ${result.soft_score}${syncNote}`,
+    );
+  } catch (err) {
+    return error(
+      res,
+      err.message || 'Xếp toàn trường thất bại',
+      err.status || 400,
+      err.validation || err.solver_result || err.message,
+    );
+  }
 };
 
 module.exports = {
   list,
   myClass,
   listMine,
+  listByRoom,
   create,
   update,
   patchLesson,
@@ -516,6 +605,7 @@ module.exports = {
   remove,
   validation,
   validationSchool,
+  readiness,
   generate,
   generateSchool,
   repack,

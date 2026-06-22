@@ -21,14 +21,18 @@ module.exports = {
       VAN: 105,
       ANH: 105,
       SU: 52,
+      TD: 70,
+      GDQP: 35,
+      HTTN: 35,
       VLY: 70,
       HOA: 70,
       SINH: 70,
       DIA: 70,
+      GDKTPL: 52,
       CN: 70,
       TIN: 70,
-      TD: 70,
-      GDCD: 52,
+      AMNHAC: 35,
+      MTHUAT: 35,
     };
 
     const now = new Date();
@@ -45,7 +49,7 @@ module.exports = {
           total_periods_per_year: total,
           teaching_weeks: teachingWeeks,
           periods_per_week,
-          is_required: ['TOAN', 'VAN', 'ANH', 'SU', 'TD', 'GDCD'].includes(code),
+          is_required: ['TOAN', 'VAN', 'ANH', 'SU', 'TD', 'GDQP', 'HTTN'].includes(code),
           created_at: now,
           updated_at: now,
         });

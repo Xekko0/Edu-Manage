@@ -18,6 +18,8 @@ import {
   linkParentChild,
   unlinkParentChild,
 } from '../../api/user.api';
+import { generateInviteCode } from '../../api/invite.api';
+import { Copy, CheckCircle, KeyRound } from 'lucide-react';
 
 const emptyCreate = { email: '', password: '', full_name: '', phone: '', student_id: '' };
 const emptyEdit = { full_name: '', phone: '', password: '' };
@@ -38,6 +40,11 @@ export default function TeacherParents() {
   const [editing, setEditing] = useState(null);
   const [linkForm, setLinkForm] = useState({ parent_id: '', student_id: '' });
   const [saving, setSaving] = useState(false);
+  // v2.0: Invite code state
+  const [inviteModal, setInviteModal] = useState(false);
+  const [inviteStudentId, setInviteStudentId] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [inviteCopied, setInviteCopied] = useState(false);
 
   const load = useCallback(async () => {
     if (!homeroomClass?.id) { setLoading(false); return; }
@@ -146,6 +153,30 @@ export default function TeacherParents() {
     }
   };
 
+  // v2.0: Tạo mã mời liên kết PH–HS
+  const handleGenerateInvite = async () => {
+    if (!inviteStudentId) return toast.error('Chọn học sinh');
+    setSaving(true);
+    try {
+      const res = await generateInviteCode(Number(inviteStudentId));
+      if (res?.success) {
+        setInviteCode(res.data.code);
+        setInviteCopied(false);
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi tạo mã mời');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(inviteCode);
+    setInviteCopied(true);
+    toast.success('Đã copy mã mời');
+    setTimeout(() => setInviteCopied(false), 2000);
+  };
+
   if (clsLoading) return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
 
   if (!homeroomClass) {
@@ -160,6 +191,9 @@ export default function TeacherParents() {
   return (
     <div>
       <PageHeader title={`PH lớp ${homeroomClass.name}`}>
+        <Button variant="outline" onClick={() => { setInviteModal(true); setInviteCode(''); setInviteStudentId(''); }}>
+          <KeyRound size={14} /> Mã mời
+        </Button>
         <Button variant="secondary" onClick={() => setLinkOpen(true)}>Liên kết PH↔HS</Button>
         <Button onClick={() => setCreateOpen(true)}>+ Tạo PH</Button>
       </PageHeader>
@@ -265,6 +299,43 @@ export default function TeacherParents() {
             <Button type="submit" disabled={saving}>{saving ? 'Đang lưu…' : 'Liên kết'}</Button>
           </div>
         </form>
+      </Modal>
+
+      {/* v2.0: Modal tạo mã mời liên kết PH–HS */}
+      <Modal open={inviteModal} title="Tạo mã mời liên kết" onClose={() => setInviteModal(false)}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Tạo mã mời để phụ huynh tự liên kết với con. Gửi mã này cho PH, họ sẽ nhập mã trong mục "Liên kết con".
+          </p>
+          <Select label="Chọn học sinh" value={inviteStudentId} onChange={(e) => { setInviteStudentId(e.target.value); setInviteCode(''); }}>
+            <option value="">— Chọn HS —</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>{s.user?.full_name} ({s.student_code})</option>
+            ))}
+          </Select>
+
+          {!inviteCode ? (
+            <Button onClick={handleGenerateInvite} disabled={saving || !inviteStudentId} className="w-full">
+              <KeyRound size={14} /> {saving ? 'Đang tạo...' : 'Tạo mã mời'}
+            </Button>
+          ) : (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <CheckCircle size={24} className="mx-auto text-green-500 mb-2" />
+              <p className="text-xs text-slate-500 mb-1">Mã mời (hết hạn sau 30 ngày):</p>
+              <div className="flex items-center justify-center gap-2">
+                <span className="text-2xl font-mono font-bold tracking-widest text-green-700">{inviteCode}</span>
+                <button onClick={handleCopyCode} className="p-1 hover:bg-green-100 rounded">
+                  {inviteCopied ? <CheckCircle size={16} className="text-green-500" /> : <Copy size={16} className="text-slate-400" />}
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">Gửi mã này cho phụ huynh để họ tự liên kết</p>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="secondary" onClick={() => setInviteModal(false)}>Đóng</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -1,80 +1,69 @@
-/** S12 — Lịch học tuần (ca sáng/chiều, trùng lịch, GV xem/sửa tiết mình). */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+/**
+ * Schedule — Trang Thời khóa biểu mới (Flat-Premium).
+ * Tự động chuyển view theo role: Student / Teacher / Parent / Admin.
+ */
+import { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import useAuth from '../../hooks/useAuth';
 import useStudentContext from '../../hooks/useStudentContext';
 import useTeacherClasses from '../../hooks/useTeacherClasses';
 import { useSchoolYear } from '../../contexts/SchoolYearContext';
 import PageHeader from '../../components/ui/PageHeader';
-import Select from '../../components/ui/Select';
 import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import Input from '../../components/ui/Input';
+import Select from '../../components/ui/Select';
 import Spinner from '../../components/ui/Spinner';
-import EmptyState from '../../components/ui/EmptyState';
-import ScheduleGridTable from '../../components/schedule/ScheduleGridTable';
-import StudentScheduleView from '../../components/schedule/StudentScheduleView';
-import ScheduleSlotDetail from '../../components/schedule/ScheduleSlotDetail';
+import Toggle from '../../components/ui/Toggle';
+import { SkeletonTable } from '../../components/ui/Skeleton';
+import ScheduleGrid from '../../components/schedule/ScheduleGrid';
+import ScheduleWeekNav from '../../components/schedule/ScheduleWeekNav';
+import MobileTimeline from '../../components/schedule/MobileTimeline';
+import ScheduleSlotCard, { getPeriodTime } from '../../components/schedule/ScheduleSlotCard';
+import PerspectiveSelector from '../../components/schedule/PerspectiveSelector';
 import {
-  listSchedules,
-  listSchedulesMine,
-  listSchedulesMyClass,
-  moveSchedule,
-  removeSchedule,
-  createSchedule,
-  patchScheduleLesson,
+  listSchedules, listSchedulesMine, listSchedulesMyClass,
 } from '../../api/schedule.api';
-import useWebPush, { getReminderMinutesPref, setReminderMinutesPref } from '../../hooks/useWebPush';
-import { listClasses } from '../../api/class.api';
 import { getTimetableConfig } from '../../api/timetable-config.api';
-import {
-  SESSION_LABEL,
-  DAY_OF_WEEK,
-  CONFLICT_LABEL,
-  TEACHER_MAX_PERIODS_WEEK,
-} from '../../utils/labels';
+import { listClasses } from '../../api/class.api';
+import { getMyICalLink } from '../../api/ical.api';
+import { CalendarPlus, Copy, CheckCircle, Clock, MapPin, User, Users, Video, AlertTriangle, BookOpen, Coffee, DoorOpen } from 'lucide-react';
+import { DAY_OF_WEEK } from '../../utils/labels';
 import { gridFromTimetableConfig, defaultTimetableConfig } from '../../utils/timetableGrid';
+
+// Helper: lấy period hiện tại
+const getCurrentPeriod = () => {
+  const now = new Date();
+  const totalMin = now.getHours() * 60 + now.getMinutes();
+  const period = Math.floor((totalMin - 420) / 45) + 1; // 420 = 7:00 AM
+  return period >= 1 && period <= 10 ? period : null;
+};
 
 export default function Schedule() {
   const { user } = useAuth();
-  const { schoolYear } = useSchoolYear();
+  const { schoolYear, semester } = useSchoolYear();
   const { selectedStudent, loading: ctxLoading } = useStudentContext();
-  const { homeroomClass, teachingClasses, assignments, loading: tcLoading } = useTeacherClasses();
-  const [session, setSession] = useState('morning');
-  const [classId, setClassId] = useState('');
-  const [items, setItems] = useState([]);
-  const [allClasses, setAllClasses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  /** Mặc định xem TKB cả lớp; bật lọc chỉ tiết mình dạy khi cần. */
-  const [mineOnly, setMineOnly] = useState(false);
-  const [mineClassFilter, setMineClassFilter] = useState('');
-  const [editSlot, setEditSlot] = useState(null);
-  const [roomEdit, setRoomEdit] = useState('');
-  const [moveForm, setMoveForm] = useState({ day_of_week: 1, period: 1, session: 'morning' });
-  const [saving, setSaving] = useState(false);
+  const { homeroomClass, teachingClasses, loading: tcLoading } = useTeacherClasses();
+
+  const [slots, setSlots] = useState([]);
   const [timetableConfig, setTimetableConfig] = useState(defaultTimetableConfig());
-  const [studentSlots, setStudentSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [session, setSession] = useState('morning');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [weekStart, setWeekStart] = useState(null);
+  const [perspective, setPerspective] = useState('class');
+  const [adminClasses, setAdminClasses] = useState([]);
+  const [adminClassId, setAdminClassId] = useState('');
+  const [icalModal, setIcalModal] = useState(false);
+  const [icalUrl, setIcalUrl] = useState('');
+  const [icalCopied, setIcalCopied] = useState(false);
   const [detailSlot, setDetailSlot] = useState(null);
-  const [lessonForm, setLessonForm] = useState({
-    lesson_topic: '',
-    homework_reminder: '',
-    delivery_mode: 'offline',
-    online_meeting_url: '',
-  });
-  const [reminderMin, setReminderMin] = useState(getReminderMinutesPref());
 
   const isStudent = user?.role === 'student';
-  const push = useWebPush({ enabled: isStudent });
-
+  const isParent = user?.role === 'parent';
   const isTeacher = user?.role === 'subject';
-  const grid = gridFromTimetableConfig(timetableConfig, session);
-  const sessionOptions = timetableConfig.sessions || ['morning'];
-  const isFamily = ['parent', 'student'].includes(user?.role);
+  const isAdmin = user?.role === 'admin';
+  const isFamily = isStudent || isParent;
 
-  const canPickClass = isTeacher && !mineOnly && teachingClasses.length > 0;
-  const canViewFullClass = user?.role === 'admin'
-    || (canPickClass && classId && teachingClasses.some((c) => String(c.id) === String(classId)));
-
+  // Load timetable config
   useEffect(() => {
     getTimetableConfig({ school_year: schoolYear })
       .then((res) => {
@@ -85,489 +74,240 @@ export default function Schedule() {
       .catch(() => {});
   }, [schoolYear]);
 
+  // Load admin classes
   useEffect(() => {
-    if (user?.role === 'admin') {
+    if (isAdmin) {
       listClasses({ school_year: schoolYear })
         .then((res) => {
           const list = res?.data || [];
-          setAllClasses(list);
-          if (!classId && list[0]) setClassId(String(list[0].id));
+          setAdminClasses(list);
+          if (!adminClassId && list[0]) setAdminClassId(String(list[0].id));
         })
-        .catch((err) => toast.error(err?.message || 'Không tải danh sách lớp'));
+        .catch(() => {});
     }
-  }, [user?.role]);
+  }, [isAdmin, schoolYear]);
 
+  // Set default class for teacher
   useEffect(() => {
-    if (!isTeacher || mineOnly || tcLoading) return;
-    const defaultId = homeroomClass?.id || teachingClasses[0]?.id;
-    if (defaultId) setClassId(String(defaultId));
-  }, [isTeacher, mineOnly, homeroomClass?.id, teachingClasses, tcLoading]);
+    if (isTeacher && !tcLoading) {
+      const defaultId = homeroomClass?.id || teachingClasses[0]?.id;
+      if (defaultId && !adminClassId) setAdminClassId(String(defaultId));
+    }
+  }, [isTeacher, tcLoading, homeroomClass, teachingClasses]);
 
+  // Set class for family
   useEffect(() => {
     if (isFamily && selectedStudent?.class_id) {
-      setClassId(String(selectedStudent.class_id));
+      setAdminClassId(String(selectedStudent.class_id));
     }
-  }, [isFamily, selectedStudent?.class_id]);
+  }, [isFamily, selectedStudent]);
 
+  // Calculate week start
+  useEffect(() => {
+    const d = new Date(selectedDate);
+    const day = d.getDay() || 7;
+    const start = new Date(d);
+    start.setDate(d.getDate() - day + 1);
+    setWeekStart(start.toISOString().slice(0, 10));
+  }, [selectedDate]);
+
+  // Load schedules
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (isTeacher && mineOnly) {
-        const res = await listSchedulesMine({ school_year: schoolYear });
-        if (res?.success) setItems(res.data?.items || []);
-      } else if (canViewFullClass && classId) {
-        const res = await listSchedules({ class_id: classId, school_year: schoolYear });
-        if (res?.success) {
-          const payload = res.data;
-          setItems(payload?.items || payload || []);
-        }
-      } else if (isFamily) {
-        const res = await listSchedulesMyClass({
-          school_year: schoolYear,
-          ...(user?.role === 'parent' && selectedStudent?.id
-            ? { student_id: selectedStudent.id }
-            : {}),
-        });
-        if (res?.success) {
-          const slots = res.data?.slots || res.data?.items || [];
-          setStudentSlots(slots);
-          setItems([]);
-        }
+      const params = { school_year: schoolYear, semester };
+      let res;
+
+      if (isAdmin && adminClassId) {
+        res = await listSchedules({ ...params, class_id: adminClassId });
+      } else if (isTeacher) {
+        res = await listSchedulesMyClass({ ...params, class_id: adminClassId || homeroomClass?.id });
       } else {
-        setItems([]);
+        res = await listSchedulesMyClass({ ...params, class_id: selectedStudent?.class_id || adminClassId });
+      }
+
+      if (res?.success) {
+        const data = res.data;
+        setSlots(data?.items || data || []);
       }
     } catch (err) {
-      toast.error(err?.message || 'Không tải TKB');
+      console.error('Schedule load error:', err);
     } finally {
       setLoading(false);
     }
-  }, [classId, mineOnly, isTeacher, canViewFullClass, isFamily, schoolYear, selectedStudent?.id, user?.role]);
+  }, [isAdmin, isTeacher, adminClassId, homeroomClass, selectedStudent, schoolYear, semester]);
 
   useEffect(() => { load(); }, [load]);
 
-  const mineClassOptions = useMemo(() => {
-    if (!isTeacher || !mineOnly) return [];
-    const map = new Map();
-    items.forEach((s) => {
-      const id = s.class_id ?? s.class?.id;
-      const name = s.class?.name || teachingClasses.find((c) => c.id === id)?.name || `Lớp #${id}`;
-      if (id) map.set(id, name);
-    });
-    return [...map.entries()].map(([id, name]) => ({ id: String(id), name }));
-  }, [items, isTeacher, mineOnly, teachingClasses]);
+  // Filter slots for selected day (mobile timeline)
+  const currentPeriod = getCurrentPeriod();
+  const selectedDay = new Date(selectedDate).getDay() || 7;
+  const todaySlots = slots
+    .filter((s) => s.day_of_week === selectedDay)
+    .sort((a, b) => a.period - b.period);
 
-  useEffect(() => {
-    if (!mineOnly || mineClassOptions.length === 0) return;
-    setMineClassFilter((prev) => {
-      if (prev && mineClassOptions.some((c) => c.id === prev)) return prev;
-      return mineClassOptions[0].id;
-    });
-  }, [mineOnly, mineClassOptions]);
-
-  const displayedItems = useMemo(() => {
-    if (!isTeacher || !mineOnly) return items;
-    if (!mineClassFilter || mineClassFilter === 'all') return items;
-    return items.filter(
-      (s) => String(s.class_id ?? s.class?.id) === String(mineClassFilter),
-    );
-  }, [items, isTeacher, mineOnly, mineClassFilter]);
-
-  const isOwnSlot = (slot) => slot && Number(slot.teacher_id) === Number(user?.id);
-  const canEditSlot = (slot) => isTeacher && slot && isOwnSlot(slot);
-
-  const openEdit = (slot) => {
-    setEditSlot(slot);
-    setRoomEdit(slot.room || '');
-    setLessonForm({
-      lesson_topic: slot.lesson_topic || '',
-      homework_reminder: slot.homework_reminder || '',
-      delivery_mode: slot.delivery_mode || 'offline',
-      online_meeting_url: slot.online_meeting_url || '',
-    });
-    setMoveForm({
-      day_of_week: slot.day_of_week,
-      period: slot.period,
-      session: slot.session || 'morning',
-    });
-  };
-
-  const handleSaveLesson = async () => {
-    if (!editSlot?.id) return;
-    setSaving(true);
+  // iCal handler
+  const handleICal = async () => {
     try {
-      const res = await patchScheduleLesson(editSlot.id, lessonForm);
-      if (res?.success) {
-        toast.success('Đã lưu nội dung tiết');
-        setEditSlot(null);
-        load();
-      }
-    } catch (err) {
-      toast.error(err?.message || 'Lưu nội dung tiết thất bại');
-    } finally {
-      setSaving(false);
-    }
+      const res = await getMyICalLink();
+      if (res?.success) { setIcalUrl(res.data.url); setIcalModal(true); }
+    } catch { toast.error('Lỗi lấy link calendar'); }
   };
 
-  const handleSave = async () => {
-    if (!editSlot) return;
-    setSaving(true);
-    const payload = {
-      day_of_week: Number(moveForm.day_of_week),
-      period: Number(moveForm.period),
-      session: moveForm.session,
-      room: roomEdit,
-    };
-    try {
-      const res = await moveSchedule(editSlot.id, payload);
-      if (res?.success) {
-        const warn = res.data?.warnings?.length;
-        toast.success(warn ? 'Đã lưu (có cảnh báo trùng lịch)' : 'Đã cập nhật lịch dạy');
-        setSession(moveForm.session);
-        setEditSlot(null);
-        load();
-      }
-    } catch (err) {
-      toast.error(err?.message || 'Lưu thất bại');
-    } finally {
-      setSaving(false);
-    }
+  const handleCopyICal = () => {
+    navigator.clipboard.writeText(icalUrl);
+    setIcalCopied(true);
+    toast.success('Đã sao chép');
+    setTimeout(() => setIcalCopied(false), 2000);
   };
 
-  const handleDelete = async () => {
-    if (!editSlot || !window.confirm('Xóa tiết này?')) return;
-    setSaving(true);
-    try {
-      const res = await removeSchedule(editSlot.id);
-      if (res?.success) {
-        toast.success('Đã xóa');
-        setEditSlot(null);
-        load();
-      }
-    } catch (err) {
-      toast.error(err?.message || 'Xóa thất bại');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const myAssignmentsForClass = assignments.filter(
-    (a) => String(a.class_id) === String(classId),
-  );
-
-  const handleAddSlot = async (day, period, assignment) => {
-    if (!classId || !assignment) return;
-    setSaving(true);
-    try {
-      const res = await createSchedule({
-        class_id: Number(classId),
-        subject_id: assignment.subject_id,
-        teacher_id: user.id,
-        day_of_week: day,
-        period,
-        session,
-        school_year: schoolYear,
-        room: `P${teachingClasses.find((c) => String(c.id) === classId)?.name || ''}`,
-      });
-      if (res?.success) {
-        const warn = res.data?.warnings?.length;
-        toast.success(warn ? 'Đã thêm (có cảnh báo trùng lịch)' : 'Đã thêm tiết');
-        load();
-      }
-    } catch (err) {
-      toast.error(err?.message || 'Thêm tiết thất bại');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const conflictCount = displayedItems.filter(
-    (i) => isOwnSlot(i) && i.conflictTypes?.length > 0,
-  ).length;
-
-  const classOptions = user?.role === 'admin' ? allClasses : teachingClasses;
-
-  const renderCell = ({ day, period, slots }) => {
-    const visible = mineOnly && isTeacher
-      ? slots.filter((s) => isOwnSlot(s))
-      : slots;
-
-    const addButton = isTeacher && !mineOnly && canViewFullClass && myAssignmentsForClass.length === 1 && (
-      <button
-        type="button"
-        className="text-xs text-brand hover:underline mt-1"
-        disabled={saving}
-        onClick={() => handleAddSlot(day, period, myAssignmentsForClass[0])}
-      >
-        + Thêm môn
-      </button>
-    );
-
-    if (!visible.length) {
-      return addButton || <span className="text-slate-300">—</span>;
-    }
-
-    return (
-      <div className="flex flex-col gap-1">
-        {visible.map((slot) => {
-          const conflicts = slot.conflictTypes || [];
-          const editable = canEditSlot(slot);
-          return (
-            <button
-              key={slot.id}
-              type="button"
-              disabled={!editable}
-              onClick={() => editable && openEdit(slot)}
-              className={`text-xs leading-tight text-left w-full p-1 rounded ${
-                editable ? 'hover:bg-slate-50 cursor-pointer' : 'cursor-default'
-              } ${conflicts.length && isOwnSlot(slot) ? 'ring-2 ring-red-500 bg-red-50' : 'bg-slate-50'}`}
-            >
-              <div className="font-semibold text-brand">{slot.subject?.name}</div>
-              {mineOnly && slot.class?.name && (
-                <div className="text-slate-600 font-medium">{slot.class.name}</div>
-              )}
-              {(!isTeacher || !mineOnly) && (
-                <div className="text-slate-500">{slot.teacher?.full_name}</div>
-              )}
-              {slot.room && <div className="text-slate-400">{slot.room}</div>}
-              {conflicts.length > 0 && isOwnSlot(slot) && (
-                <div className="text-red-600 font-medium mt-0.5 text-[10px]">
-                  {conflicts.map((t) => CONFLICT_LABEL[t] || t).join(', ')}
-                </div>
-              )}
-              {editable && <div className="text-slate-400 mt-0.5">Nhấn để sửa</div>}
-            </button>
-          );
-        })}
-        {addButton}
-      </div>
-    );
-  };
-
-  if ((ctxLoading && isFamily) || (tcLoading && isTeacher)) {
+  if (ctxLoading || tcLoading) {
     return <div className="flex justify-center py-16"><Spinner size="lg" /></div>;
   }
 
   return (
-    <div>
-      <PageHeader title={mineOnly && isTeacher ? 'Lịch dạy của tôi' : 'Lịch học tuần'}>
-        {isTeacher && (
-          <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap" title="Bật: chỉ các tiết bạn dạy (có thể nhiều lớp). Tắt: TKB đầy đủ của một lớp.">
-            <input
-              type="checkbox"
-              checked={mineOnly}
-              onChange={(e) => {
-                setMineOnly(e.target.checked);
-                if (!e.target.checked && (homeroomClass?.id || teachingClasses[0]?.id)) {
-                  setClassId(String(homeroomClass?.id || teachingClasses[0]?.id));
-                }
-              }}
-            />
-            Chỉ tiết tôi dạy
-          </label>
-        )}
-        {isTeacher && mineOnly && mineClassOptions.length > 1 && (
-          <Select
-            value={mineClassFilter}
-            onChange={(e) => setMineClassFilter(e.target.value)}
-            className="w-36"
-          >
-            {mineClassOptions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
+    <div className="space-y-4">
+      {/* Header */}
+      <PageHeader
+        title={isStudent ? 'Lịch học của tôi' : isParent ? `Lịch học — ${selectedStudent?.user?.full_name || 'con'}` : isTeacher ? 'Lịch dạy' : 'Thời khóa biểu'}
+        description={`${schoolYear} · HK${semester}`}
+      >
+        {isAdmin && <PerspectiveSelector value={perspective} onChange={setPerspective} />}
+        {isAdmin && (
+          <Select value={adminClassId} onChange={(e) => setAdminClassId(e.target.value)} className="w-32">
+            {adminClasses.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         )}
-        {canPickClass && (
-          <Select value={classId} onChange={(e) => setClassId(e.target.value)} className="w-40">
-            {classOptions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </Select>
-        )}
-        <div className="flex gap-1">
-          {sessionOptions.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSession(s)}
-              className={`px-3 py-1.5 text-sm rounded-md border ${
-                session === s ? 'bg-brand text-white border-brand' : 'bg-white hover:bg-slate-50'
-              }`}
-            >
-              {SESSION_LABEL[s]}
-            </button>
+        <Select value={session} onChange={(e) => setSession(e.target.value)} className="w-28">
+          {timetableConfig.sessions?.map((s) => (
+            <option key={s} value={s}>{s === 'morning' ? '☀️ Sáng' : '🌙 Chiều'}</option>
           ))}
-        </div>
+        </Select>
+        <Button variant="outline" size="sm" onClick={handleICal}>
+          <CalendarPlus size={14} /> <span className="hidden sm:inline">Thêm vào Calendar</span>
+        </Button>
       </PageHeader>
 
-      {isTeacher && mineOnly && (
-        <p className="mb-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-          <strong>Lịch dạy của tôi</strong> — chỉ các tiết bạn được phân công (có thể khác lớp).
-          Tắt «Chỉ tiết tôi dạy» để xem <strong>TKB đầy đủ của cả lớp</strong> (mọi giáo viên, mọi môn).
-        </p>
-      )}
-      {isTeacher && !mineOnly && (
-        <p className="mb-2 text-sm text-slate-600">
-          Đang xem <strong>TKB cả lớp</strong>. Nhấn tiết của bạn để sửa phòng / chuyển tiết.
-        </p>
-      )}
+      {/* Week Navigation */}
+      <ScheduleWeekNav
+        weekStart={weekStart}
+        selectedDate={selectedDate}
+        onDateSelect={setSelectedDate}
+        onPrev={() => {
+          const d = new Date(selectedDate);
+          d.setDate(d.getDate() - 7);
+          setSelectedDate(d.toISOString().slice(0, 10));
+        }}
+        onNext={() => {
+          const d = new Date(selectedDate);
+          d.setDate(d.getDate() + 7);
+          setSelectedDate(d.toISOString().slice(0, 10));
+        }}
+        teachingDays={timetableConfig.teaching_days || [1, 2, 3, 4, 5]}
+      />
 
-      {conflictCount > 0 && isTeacher && (
-        <p className="mb-3 text-sm text-red-600 font-medium">
-          Có {conflictCount} tiết của bạn có cảnh báo (viền đỏ). Giới hạn {TEACHER_MAX_PERIODS_WEEK} tiết/tuần/GV.
-        </p>
-      )}
-
-      {isFamily && (
-        <section className="mb-4 p-3 border rounded-lg bg-slate-50 text-sm space-y-2">
-          {isStudent && push.supported && (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-medium">Nhắc trước giờ học:</span>
-              <select
-                className="border rounded px-2 py-1 text-sm"
-                value={reminderMin}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  setReminderMin(v);
-                  setReminderMinutesPref(v);
-                }}
-              >
-                <option value={15}>15 phút</option>
-                <option value={30}>30 phút</option>
-              </select>
-              {!push.subscribed ? (
-                <Button type="button" disabled={push.loading} onClick={push.subscribe}>
-                  Bật thông báo đẩy
-                </Button>
-              ) : (
-                <Button type="button" variant="secondary" disabled={push.loading} onClick={push.unsubscribe}>
-                  Tắt thông báo
-                </Button>
-              )}
-            </div>
-          )}
-          <p className="text-xs text-slate-600">
-            Mỗi tiết hiển thị giáo viên, phòng học và hình thức (trực tiếp / online). Nhấn tiết để xem bài tập và link lớp.
-          </p>
-        </section>
-      )}
-
+      {/* Content */}
       {loading ? (
-        <div className="flex justify-center py-12"><Spinner /></div>
+        <div className="bg-white rounded-xl border border-zinc-100 p-6">
+          <SkeletonTable rows={6} cols={6} />
+        </div>
       ) : isFamily ? (
-        !studentSlots.length ? (
-          <EmptyState message="Chưa có thời khóa biểu cho lớp này." />
-        ) : (
-          <StudentScheduleView
-            slots={studentSlots}
-            timetableConfig={timetableConfig}
-            session={session}
-            onSessionChange={setSession}
-            onSelectSlot={setDetailSlot}
-          />
-        )
-      ) : !displayedItems.length ? (
-        <EmptyState message={mineOnly ? 'Bạn chưa có tiết dạy trong lựa chọn này.' : 'Chưa có thời khóa biểu cho lựa chọn này.'} />
-      ) : (
-        <ScheduleGridTable
-          items={displayedItems}
+        /* === FAMILY VIEW: Mobile Timeline + Desktop Grid === */
+        <>
+          <div className="md:hidden">
+            <MobileTimeline slots={todaySlots} />
+          </div>
+          <div className="hidden md:block">
+            <ScheduleGrid
+              slots={slots}
+              timetableConfig={timetableConfig}
+              session={session}
+              selectedDay={selectedDay}
+              onSlotClick={setDetailSlot}
+              readOnly
+            />
+          </div>
+        </>
+      ) : isTeacher ? (
+        /* === TEACHER VIEW: Grid + own slots highlight === */
+        <ScheduleGrid
+          slots={slots}
+          timetableConfig={timetableConfig}
           session={session}
-          mineOnly={mineOnly && isTeacher}
-          userId={user?.id}
-          showTeacher={!isTeacher || !mineOnly}
-          renderCell={isTeacher && !mineOnly ? renderCell : undefined}
+          selectedDay={selectedDay}
+          onSlotClick={setDetailSlot}
+        />
+      ) : (
+        /* === ADMIN VIEW: Grid + multi-perspective === */
+        <ScheduleGrid
+          slots={slots}
+          timetableConfig={timetableConfig}
+          session={session}
+          selectedDay={selectedDay}
+          onSlotClick={setDetailSlot}
         />
       )}
 
-      <ScheduleSlotDetail
-        slot={detailSlot}
-        open={!!detailSlot}
-        onClose={() => setDetailSlot(null)}
-      />
-
-      <Modal open={!!editSlot} title="Sửa tiết của tôi" onClose={() => setEditSlot(null)}>
-        {editSlot && (
-          <div className="space-y-4">
-            <p className="text-sm font-medium">
-              {editSlot.subject?.name} — {editSlot.class?.name}
-            </p>
-            <Input label="Phòng" value={roomEdit} onChange={(e) => setRoomEdit(e.target.value)} />
-            <Input
-              label="Chủ đề bài học"
-              value={lessonForm.lesson_topic}
-              onChange={(e) => setLessonForm({ ...lessonForm, lesson_topic: e.target.value })}
-            />
-            <Input
-              label="Nhắc bài tập / chuẩn bị"
-              value={lessonForm.homework_reminder}
-              onChange={(e) => setLessonForm({ ...lessonForm, homework_reminder: e.target.value })}
-            />
-            <Select
-              label="Hình thức học"
-              value={lessonForm.delivery_mode}
-              onChange={(e) => setLessonForm({ ...lessonForm, delivery_mode: e.target.value })}
-            >
-              <option value="offline">Trực tiếp</option>
-              <option value="online">Trực tuyến</option>
-            </Select>
-            {lessonForm.delivery_mode === 'online' && (
-              <Input
-                label="Link Zoom / Teams"
-                value={lessonForm.online_meeting_url}
-                onChange={(e) => setLessonForm({ ...lessonForm, online_meeting_url: e.target.value })}
-              />
-            )}
-            <div className="border-t pt-3">
-              <p className="text-sm font-medium mb-2">Chuyển sang ô khác</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Select
-                  label="Thứ"
-                  value={moveForm.day_of_week}
-                  onChange={(e) => setMoveForm({ ...moveForm, day_of_week: Number(e.target.value) })}
-                >
-                  {grid.days.map((d) => (
-                    <option key={d} value={d}>{DAY_OF_WEEK[d]}</option>
-                  ))}
-                </Select>
-                <Select
-                  label="Ca"
-                  value={moveForm.session}
-                  onChange={(e) => setMoveForm({ ...moveForm, session: e.target.value })}
-                >
-                  {sessionOptions.map((s) => (
-                    <option key={s} value={s}>{SESSION_LABEL[s]}</option>
-                  ))}
-                </Select>
-                <Select
-                  label="Tiết"
-                  value={moveForm.period}
-                  onChange={(e) => setMoveForm({ ...moveForm, period: Number(e.target.value) })}
-                >
-                  {gridFromTimetableConfig(timetableConfig, moveForm.session).periods.map((p) => (
-                    <option key={p} value={p}>Tiết {p}</option>
-                  ))}
-                </Select>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Đổi thứ / ca / tiết rồi bấm Lưu — hệ thống sẽ chuyển sang tab ca tương ứng.
-              </p>
-            </div>
-            <div className="flex justify-between gap-2 pt-2">
-              <Button type="button" variant="secondary" onClick={handleDelete} disabled={saving}>
-                Xóa tiết
-              </Button>
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" onClick={() => setEditSlot(null)}>Hủy</Button>
-                <Button type="button" variant="secondary" onClick={handleSaveLesson} disabled={saving}>
-                  Lưu nội dung
-                </Button>
-                <Button type="button" onClick={handleSave} disabled={saving}>
-                  {saving ? 'Đang lưu…' : 'Lưu vị trí'}
-                </Button>
-              </div>
+      {/* Slot Detail Modal */}
+      {detailSlot && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setDetailSlot(null)}>
+          <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-sm" />
+          <div className="relative bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-zinc-100 p-6 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+            <ScheduleSlotCard slot={detailSlot} isNow={false} isPast={false} />
+            <div className="mt-4 flex justify-end">
+              <button onClick={() => setDetailSlot(null)} className="px-4 py-2 text-sm text-zinc-500 hover:text-zinc-700 transition-colors">
+                Đóng
+              </button>
             </div>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
+
+      {/* iCal Integration Card */}
+      {icalModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setIcalModal(false)}>
+          <div className="absolute inset-0 bg-zinc-900/30 backdrop-blur-sm" />
+          <div className="relative bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-zinc-100 p-6 max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                <CalendarPlus size={20} className="text-indigo-500" />
+              </div>
+              <div>
+                <h3 className="text-base font-semibold text-zinc-800">Đồng bộ lịch trình cá nhân</h3>
+                <p className="text-xs text-zinc-400">Kết nối EduSmart với ứng dụng lịch của bạn</p>
+              </div>
+            </div>
+            <div className="bg-zinc-50 rounded-xl border border-zinc-100 p-3 mb-4">
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs font-mono text-zinc-500 truncate select-all">{icalUrl}</code>
+                <button
+                  onClick={handleCopyICal}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                    icalCopied
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                      : 'bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-50'
+                  }`}
+                >
+                  {icalCopied ? <CheckCircle size={13} /> : <Copy size={13} />}
+                  {icalCopied ? 'Đã sao chép' : 'Sao chép'}
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mb-5">
+              {['Google Calendar', 'Apple Calendar', 'Outlook'].map((cal) => (
+                <span key={cal} className="text-[10px] bg-zinc-50 text-zinc-500 px-2 py-1 rounded-lg border border-zinc-100">
+                  {cal}
+                </span>
+              ))}
+            </div>
+            <div className="flex justify-end">
+              <button onClick={() => setIcalModal(false)} className="px-4 py-2 text-sm text-zinc-500 hover:text-zinc-700 transition-colors">
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

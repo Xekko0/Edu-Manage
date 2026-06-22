@@ -7,4 +7,6 @@ module.exports = {
   ...require('./curriculum'),
   ...require('./room-assign'),
   ...require('./hard-constraints'),
+  ...require('./semester'),
+  ...require('./solver'),
 };

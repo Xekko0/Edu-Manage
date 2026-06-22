@@ -11,6 +11,7 @@ router.use(auth);
 
 // Tất cả giáo viên đều role=subject; chỉ GVCN (homeroom middleware) được điểm danh.
 router.post('/mark', role('admin', 'subject'), homeroom, ctrl.mark);
+router.patch('/:id/late', role('admin', 'subject'), homeroom, ctrl.markLate);
 router.get('/class/:class_id', role('admin', 'subject'), homeroom, ctrl.listByClass);
 router.get('/student/:student_id', parentLink, ctrl.listByStudent);
 

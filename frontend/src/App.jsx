@@ -15,9 +15,10 @@ import Reports from './pages/admin/Reports';
 import Classes from './pages/admin/Classes';
 import Subjects from './pages/admin/Subjects';
 import Tuitions from './pages/admin/Tuitions';
-import ScheduleManager from './pages/admin/ScheduleManager';
+import ScheduleManager from './pages/shared/Schedule';
 import CurriculumStandards from './pages/admin/CurriculumStandards';
 import Rooms from './pages/admin/Rooms';
+import GradingPeriods from './pages/admin/GradingPeriods';
 
 import DashboardHR from './pages/teacher/DashboardHR';
 import DashboardSub from './pages/teacher/DashboardSub';
@@ -34,6 +35,8 @@ import Scores from './pages/family/Scores';
 import Gradebook from './pages/family/Gradebook';
 import FamilyEvaluations from './pages/family/Evaluations';
 import FamilyTuition from './pages/family/Tuition';
+import LinkStudent from './pages/family/LinkStudent';
+import CompetencyProfile from './pages/family/CompetencyProfile';
 
 import Schedule from './pages/shared/Schedule';
 import Extracurricular from './pages/shared/Extracurricular';
@@ -87,6 +90,11 @@ export default function App() {
           <Route path="/admin/schedules" element={<Protected allow={['admin']}><ScheduleManager /></Protected>} />
           <Route path="/admin/curriculum" element={<Protected allow={['admin']}><CurriculumStandards /></Protected>} />
           <Route path="/admin/rooms" element={<Protected allow={['admin']}><Rooms /></Protected>} />
+          <Route path="/admin/grading-periods" element={<Protected allow={['admin']}><GradingPeriods /></Protected>} />
+          <Route
+            path="/admin/room-schedule"
+            element={<Navigate to="/admin/schedules?tab=view&mode=room" replace />}
+          />
 
           {/* Teacher */}
           <Route path="/teacher/homeroom" element={<Protected allow={['subject','admin']}><DashboardHR /></Protected>} />
@@ -102,6 +110,8 @@ export default function App() {
 
           {/* Family (PH/HS) */}
           <Route path="/family" element={<Protected allow={['parent','student']}><FamilyDashboard /></Protected>} />
+          <Route path="/family/link-student" element={<Protected allow={['parent']}><LinkStudent /></Protected>} />
+          <Route path="/family/competency" element={<Protected allow={['parent','student']}><FamilyStudentGate><CompetencyProfile /></FamilyStudentGate></Protected>} />
           <Route path="/family/scores" element={<Protected allow={['parent','student']}><FamilyStudentGate><Scores /></FamilyStudentGate></Protected>} />
           <Route path="/family/gradebook" element={<Protected allow={['parent','student']}><FamilyStudentGate><Gradebook /></FamilyStudentGate></Protected>} />
           <Route path="/family/evaluations" element={<Protected allow={['parent','student']}><FamilyStudentGate><FamilyEvaluations /></FamilyStudentGate></Protected>} />

@@ -9,8 +9,10 @@ router.use(auth);
 
 router.get('/mine', role('subject'), ctrl.listMine);
 router.get('/my-class', role('student', 'parent'), ctrl.myClass);
+router.get('/readiness', role('admin'), ctrl.readiness);
 router.get('/validation', role('admin'), ctrl.validation);
 router.get('/validation-school', role('admin'), ctrl.validationSchool);
+router.get('/by-room', role('admin'), ctrl.listByRoom);
 router.get('/', role('admin', 'subject', 'parent', 'student'), ctrl.list);
 
 router.post('/generate-school', role('admin'), ctrl.generateSchool);

@@ -1,12 +1,16 @@
 /**
  * Service tính TB môn, TB chung, xếp loại học kỳ.
+ * v2.0: hỗ trợ publishedOnly filter cho PH/HS.
  */
 const { Score, Subject } = require('../models');
 const { calcSubjectAverage, classifyGrade } = require('../utils/gradeCalc');
 
-const getStudentSubjectAverages = async (studentId, semester, schoolYear) => {
+const getStudentSubjectAverages = async (studentId, semester, schoolYear, publishedOnly = false) => {
+  const where = { student_id: studentId, semester, school_year: schoolYear };
+  if (publishedOnly) where.status = 'published';
+
   const scores = await Score.findAll({
-    where: { student_id: studentId, semester, school_year: schoolYear },
+    where,
     include: [{ model: Subject, as: 'subject' }],
   });
 

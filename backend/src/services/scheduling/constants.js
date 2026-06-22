@@ -16,6 +16,23 @@ const PROGRAM_COMPONENT_ORDER = {
   optional_elective: 4,
 };
 
+/** Trọng số chấm điểm ràng buộc mềm (Hill Climbing). */
+const SOFT_WEIGHTS = {
+  subject_same_day_over2: -50,
+  subject_same_session_over1: -30,
+  heavy_subject_day_over2: -40,
+  gap_per_slot: -20,
+  afternoon_period: -5,
+  day_load_imbalance: -8,
+};
+
+const MAX_SAME_SUBJECT_PER_DAY = 2;
+const MAX_SAME_SUBJECT_PER_SESSION = 1;
+const MANDATORY_LAB_SUBJECT_CODES = new Set(['VLY', 'HOA', 'SINH']);
+
+const HILL_CLIMB_MAX_STEPS = 2000;
+const HILL_CLIMB_TIMEOUT_MS = 30000;
+
 module.exports = {
   MAX_PERIODS_PER_SESSION,
   MAX_PERIODS_PER_WEEK,
@@ -24,4 +41,10 @@ module.exports = {
   EXPECTED_WEEKLY_BY_GRADE,
   GRADE_ANNUAL_TARGETS,
   PROGRAM_COMPONENT_ORDER,
+  SOFT_WEIGHTS,
+  MAX_SAME_SUBJECT_PER_DAY,
+  MAX_SAME_SUBJECT_PER_SESSION,
+  MANDATORY_LAB_SUBJECT_CODES,
+  HILL_CLIMB_MAX_STEPS,
+  HILL_CLIMB_TIMEOUT_MS,
 };

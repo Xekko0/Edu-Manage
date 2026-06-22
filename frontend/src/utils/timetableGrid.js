@@ -7,6 +7,9 @@ export const defaultTimetableConfig = () => ({
   afternoon_periods: 5,
   afternoon_enabled: true,
   period_duration_minutes: 45,
+  morning_break_after_period: 2,
+  morning_break_minutes: 20,
+  afternoon_break_minutes: 20,
   sessions: ['morning', 'afternoon'],
 });
 
@@ -28,3 +31,28 @@ export const fallbackGrid = () => ({
   periods: SCHEDULE_PERIODS,
   sessions: SESSIONS,
 });
+
+/** Dòng lưới gồm tiết học + hàng RA CHƠI (sau tiết 2 hoặc 3). */
+export const buildPeriodRows = (config, session = 'morning') => {
+  const grid = gridFromTimetableConfig(config, session);
+  const c = config || defaultTimetableConfig();
+  const breakAfter = session === 'afternoon'
+    ? (c.afternoon_break_after_period ?? c.morning_break_after_period ?? 2)
+    : (c.morning_break_after_period ?? 2);
+  const breakMin = session === 'afternoon'
+    ? (c.afternoon_break_minutes ?? 20)
+    : (c.morning_break_minutes ?? 20);
+  const periodRows = [];
+  for (const p of grid.periods) {
+    periodRows.push({ type: 'period', period: p });
+    if (p === breakAfter) {
+      periodRows.push({
+        type: 'break',
+        afterPeriod: p,
+        minutes: breakMin,
+        label: 'RA CHƠI',
+      });
+    }
+  }
+  return { ...grid, periodRows, breakAfter, breakMin };
+};

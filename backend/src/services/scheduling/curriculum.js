@@ -6,6 +6,14 @@ const {
   DEFAULT_TEACHING_WEEKS,
   EXPECTED_WEEKLY_BY_GRADE,
 } = require('./constants');
+const {
+  SEMESTER_ALL,
+  SEMESTER_HK1,
+  normalizeSemester,
+  curriculumKey,
+  findCurriculumStandard,
+  whereAssignmentForSemester,
+} = require('./semester');
 
 const deriveWeeklyPeriods = (totalPeriodsPerYear, teachingWeeks = DEFAULT_TEACHING_WEEKS) => {
   const weeks = Math.max(1, parseInt(teachingWeeks, 10) || DEFAULT_TEACHING_WEEKS);
@@ -39,16 +47,29 @@ const standardToPayload = (row) => {
   };
 };
 
-const getCurriculumPeriods = async ({ school_year, grade_level, subject_id }) => {
-  const row = await CurriculumStandard.findOne({
-    where: { school_year, grade_level, subject_id },
+const getCurriculumPeriods = async ({
+  school_year, grade_level, subject_id, semester = SEMESTER_ALL,
+}) => {
+  const row = await findCurriculumStandard(CurriculumStandard, {
+    school_year,
+    grade_level,
+    subject_id,
+    assignmentSemester: semester,
+    arrangeSemester: semester === SEMESTER_ALL ? SEMESTER_ALL : semester,
   });
   return row ? row.periods_per_week : null;
 };
 
-const listCurriculumForGrade = async (school_year, grade_level) => {
+const listCurriculumForGrade = async (school_year, grade_level, semester = null) => {
+  const where = { school_year, grade_level };
+  if (semester != null && semester !== '') {
+    const s = parseInt(semester, 10);
+    if (!Number.isNaN(s)) {
+      where[Op.or] = [{ semester: SEMESTER_ALL }, { semester: s }];
+    }
+  }
   const rows = await CurriculumStandard.findAll({
-    where: { school_year, grade_level },
+    where,
     include: [{
       model: Subject,
       as: 'subject',
@@ -64,6 +85,7 @@ const validateAssignmentAgainstCurriculum = async ({
   subject_id,
   school_year,
   periods_per_week,
+  semester = SEMESTER_ALL,
   allow_override = false,
 }) => {
   const cls = await Class.findByPk(class_id, { attributes: ['id', 'grade_level', 'name'] });
@@ -73,16 +95,21 @@ const validateAssignmentAgainstCurriculum = async ({
     throw err;
   }
 
-  const standard = await CurriculumStandard.findOne({
-    where: {
-      school_year,
-      grade_level: cls.grade_level,
-      subject_id,
-    },
-    include: [{ model: Subject, as: 'subject', attributes: ['code', 'name'] }],
+  const standard = await findCurriculumStandard(CurriculumStandard, {
+    school_year,
+    grade_level: cls.grade_level,
+    subject_id,
+    assignmentSemester: semester,
+    arrangeSemester: semester === SEMESTER_ALL ? SEMESTER_HK1 : semester,
   });
+  const standardInclude = standard
+    ? await CurriculumStandard.findByPk(standard.id, {
+      include: [{ model: Subject, as: 'subject', attributes: ['code', 'name'] }],
+    })
+    : null;
+  const standardRow = standardInclude || standard;
 
-  if (!standard) {
+  if (!standardRow) {
     if (allow_override) return { ok: true, grade_level: cls.grade_level, standard: null };
     const err = new Error(
       `Chưa có khung CT khối ${cls.grade_level} cho môn này — cấu hình tại Khung chương trình`,
@@ -92,7 +119,7 @@ const validateAssignmentAgainstCurriculum = async ({
     throw err;
   }
 
-  const required = standard.periods_per_week;
+  const required = standardRow.periods_per_week;
   const actual = parseInt(periods_per_week, 10);
   if (actual !== required) {
     if (allow_override) {
@@ -100,12 +127,12 @@ const validateAssignmentAgainstCurriculum = async ({
         ok: false,
         warning: true,
         grade_level: cls.grade_level,
-        standard: standardToPayload(standard),
+        standard: standardToPayload(standardRow),
         required,
         actual,
       };
     }
-    const subName = standard.subject?.name || 'môn';
+    const subName = standardRow.subject?.name || 'môn';
     const err = new Error(
       `Khối ${cls.grade_level}: ${subName} phải ${required} tiết/tuần (đang ${actual})`,
     );
@@ -117,26 +144,39 @@ const validateAssignmentAgainstCurriculum = async ({
   return {
     ok: true,
     grade_level: cls.grade_level,
-    standard: standardToPayload(standard),
+    standard: standardToPayload(standardRow),
     required,
     actual,
   };
 };
 
-const buildCurriculumStandardMap = async (school_year) => {
-  const rows = await CurriculumStandard.findAll({ where: { school_year } });
+const buildCurriculumStandardMap = async (school_year, arrangeSemester = null) => {
+  const where = { school_year };
+  if (arrangeSemester != null) {
+    where[Op.or] = [{ semester: SEMESTER_ALL }, { semester: arrangeSemester }];
+  }
+  const rows = await CurriculumStandard.findAll({ where });
   const map = new Map();
   for (const r of rows) {
-    map.set(`${r.grade_level}|${r.subject_id}`, standardToPayload(r));
+    map.set(curriculumKey(r.grade_level, r.subject_id, r.semester), standardToPayload(r));
   }
   return map;
 };
 
-const resolveRequiredPeriods = (assignment, standardMap) => {
+const resolveRequiredPeriods = (assignment, standardMap, arrangeSemester = null) => {
   const grade = assignment.class?.grade_level;
-  const std = grade != null
-    ? standardMap.get(`${grade}|${assignment.subject_id}`)
-    : undefined;
+  const asmSem = normalizeSemester(assignment.semester);
+  let std;
+  if (grade != null) {
+    if (asmSem !== SEMESTER_ALL) {
+      std = standardMap.get(curriculumKey(grade, assignment.subject_id, asmSem));
+    } else if (arrangeSemester != null) {
+      std = standardMap.get(curriculumKey(grade, assignment.subject_id, arrangeSemester))
+        || standardMap.get(curriculumKey(grade, assignment.subject_id, SEMESTER_ALL));
+    } else {
+      std = standardMap.get(curriculumKey(grade, assignment.subject_id, SEMESTER_ALL));
+    }
+  }
   const assignmentPeriods = Math.max(1, assignment.periods_per_week || 2);
   let required = assignmentPeriods;
   let curriculumRequired = null;
@@ -167,7 +207,7 @@ const resolveRequiredPeriods = (assignment, standardMap) => {
   };
 };
 
-const collectCurriculumMismatches = async (school_year, class_ids = null) => {
+const collectCurriculumMismatches = async (school_year, class_ids = null, arrangeSemester = null) => {
   const classWhere = { school_year, is_active: true };
   if (class_ids?.length) {
     classWhere.id = { [Op.in]: class_ids.map((id) => parseInt(id, 10)) };
@@ -176,18 +216,22 @@ const collectCurriculumMismatches = async (school_year, class_ids = null) => {
   const mismatches = [];
 
   for (const cls of classes) {
+    const assignWhere = { class_id: cls.id, school_year, is_active: true };
+    if (arrangeSemester != null) {
+      Object.assign(assignWhere, whereAssignmentForSemester(arrangeSemester));
+    }
     const assignments = await TeacherAssignment.findAll({
-      where: { class_id: cls.id, school_year, is_active: true },
+      where: assignWhere,
       include: [{ model: Subject, as: 'subject', attributes: ['id', 'code', 'name'] }],
     });
 
     for (const a of assignments) {
-      const standard = await CurriculumStandard.findOne({
-        where: {
-          school_year,
-          grade_level: cls.grade_level,
-          subject_id: a.subject_id,
-        },
+      const standard = await findCurriculumStandard(CurriculumStandard, {
+        school_year,
+        grade_level: cls.grade_level,
+        subject_id: a.subject_id,
+        assignmentSemester: a.semester,
+        arrangeSemester: arrangeSemester || normalizeSemester(a.semester) || SEMESTER_ALL,
       });
       const required = standard?.periods_per_week ?? null;
       const actual = a.periods_per_week;
@@ -225,9 +269,13 @@ const collectCurriculumMismatches = async (school_year, class_ids = null) => {
   return mismatches;
 };
 
-const syncAssignmentsFromCurriculum = async (school_year) => {
+const syncAssignmentsFromCurriculum = async (school_year, arrangeSemester = null) => {
+  const assignWhere = { school_year, is_active: true };
+  if (arrangeSemester != null) {
+    Object.assign(assignWhere, whereAssignmentForSemester(arrangeSemester));
+  }
   const assignments = await TeacherAssignment.findAll({
-    where: { school_year, is_active: true },
+    where: assignWhere,
     include: [
       { model: Class, as: 'class', attributes: ['id', 'name', 'grade_level'] },
       { model: Subject, as: 'subject', attributes: ['id', 'code', 'name'] },
@@ -238,12 +286,12 @@ const syncAssignmentsFromCurriculum = async (school_year) => {
   const skipped = [];
 
   for (const a of assignments) {
-    const standard = await CurriculumStandard.findOne({
-      where: {
-        school_year,
-        grade_level: a.class?.grade_level,
-        subject_id: a.subject_id,
-      },
+    const standard = await findCurriculumStandard(CurriculumStandard, {
+      school_year,
+      grade_level: a.class?.grade_level,
+      subject_id: a.subject_id,
+      assignmentSemester: a.semester,
+      arrangeSemester: arrangeSemester || normalizeSemester(a.semester) || SEMESTER_ALL,
     });
     if (!standard) {
       skipped.push({
@@ -269,9 +317,10 @@ const syncAssignmentsFromCurriculum = async (school_year) => {
     }
   }
 
-  const remaining = await collectCurriculumMismatches(school_year);
+  const remaining = await collectCurriculumMismatches(school_year, null, arrangeSemester);
   return {
     school_year,
+    semester: arrangeSemester,
     updated_count: updated.length,
     updated,
     skipped,

@@ -10,7 +10,7 @@ import EmptyState from '../../components/ui/EmptyState';
 import Card, { CardBody } from '../../components/ui/Card';
 import DataTable from '../../components/ui/DataTable';
 import { listStudents } from '../../api/student.api';
-import { enterScoresBulk } from '../../api/score.api';
+import { enterScoresBulk, publishScores } from '../../api/score.api';
 import { SCORE_TYPE_LABEL } from '../../utils/labels';
 import { useSchoolYear } from '../../contexts/SchoolYearContext';
 
@@ -83,11 +83,32 @@ export default function ScoreEntry() {
     try {
       const res = await enterScoresBulk(items);
       if (res?.success) {
-        toast.success(`Đã lưu ${res.data?.count || items.length} điểm`);
+        toast.success(`Đã lưu ${res.data?.count || items.length} điểm (bản nháp)`);
         setScores({});
       }
     } catch (err) {
       toast.error(err?.message || 'Lưu điểm thất bại');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // v2.0: Công bố điểm draft → published
+  const handlePublish = async () => {
+    if (!confirm('Công bố điểm đã nhập? Phụ huynh và học sinh sẽ thấy điểm ngay.')) return;
+    setSaving(true);
+    try {
+      const res = await publishScores({
+        subject_id: Number(subjectId),
+        class_id: Number(classId),
+        semester: Number(semester),
+        school_year: schoolYear,
+      });
+      if (res?.success) {
+        toast.success(res.message || 'Đã công bố điểm');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'Lỗi công bố điểm');
     } finally {
       setSaving(false);
     }
@@ -110,7 +131,11 @@ export default function ScoreEntry() {
   return (
     <div>
       <PageHeader title="Nhập điểm">
-        <Button onClick={handleSave} disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu điểm'}</Button>
+        <div className="flex items-center gap-2">
+          <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Bản nháp</span>
+          <Button variant="outline" onClick={handlePublish} disabled={saving}>Công bố điểm</Button>
+          <Button onClick={handleSave} disabled={saving}>{saving ? 'Đang lưu…' : 'Lưu điểm'}</Button>
+        </div>
       </PageHeader>
 
       <Card className="mb-4">

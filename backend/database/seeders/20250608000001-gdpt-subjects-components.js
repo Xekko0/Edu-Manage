@@ -2,18 +2,27 @@
 
 /** Gán program_component theo GDPT 2018 cho môn học demo. */
 const COMPONENT_BY_CODE = {
-  VAN: 'required_core',
   TOAN: 'required_core',
+  VAN: 'required_core',
   ANH: 'required_core',
   SU: 'required_core',
   TD: 'required_core',
-  GDCD: 'required_core',
+  GDQP: 'required_core',
+  HTTN: 'required_activity',
+  TRUNG: 'optional_elective',
+  PHAP: 'optional_elective',
+  NGA: 'optional_elective',
+  NHAT: 'optional_elective',
+  HAN: 'optional_elective',
   VLY: 'elective',
   HOA: 'elective',
   SINH: 'elective',
   DIA: 'elective',
+  GDKTPL: 'elective',
   CN: 'elective',
   TIN: 'elective',
+  AMNHAC: 'elective',
+  MTHUAT: 'elective',
 };
 
 module.exports = {

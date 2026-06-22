@@ -1,18 +1,28 @@
 'use strict';
 
+/** Danh mục môn THPT (GDPT) — seed ban đầu; seeder 20250611000001 bổ sung/đồng bộ đầy đủ. */
 const SUBJECTS = [
   { code: 'TOAN', name: 'Toán' },
-  { code: 'VLY', name: 'Vật lý' },
+  { code: 'VAN', name: 'Ngữ văn' },
+  { code: 'ANH', name: 'Tiếng Anh (Ngoại ngữ 1)' },
+  { code: 'SU', name: 'Lịch sử' },
+  { code: 'TD', name: 'Giáo dục thể chất' },
+  { code: 'GDQP', name: 'Giáo dục quốc phòng và an ninh' },
+  { code: 'HTTN', name: 'Hoạt động trải nghiệm, hướng nghiệp' },
+  { code: 'TRUNG', name: 'Tiếng Trung (Ngoại ngữ 1)' },
+  { code: 'PHAP', name: 'Tiếng Pháp (Ngoại ngữ 1)' },
+  { code: 'NGA', name: 'Tiếng Nga (Ngoại ngữ 1)' },
+  { code: 'NHAT', name: 'Tiếng Nhật (Ngoại ngữ 1)' },
+  { code: 'HAN', name: 'Tiếng Hàn (Ngoại ngữ 1)' },
+  { code: 'VLY', name: 'Vật lí' },
   { code: 'HOA', name: 'Hóa học' },
   { code: 'SINH', name: 'Sinh học' },
-  { code: 'VAN', name: 'Ngữ văn' },
-  { code: 'SU', name: 'Lịch sử' },
-  { code: 'DIA', name: 'Địa lý' },
-  { code: 'GDCD', name: 'Giáo dục công dân' },
-  { code: 'ANH', name: 'Tiếng Anh' },
+  { code: 'DIA', name: 'Địa lí' },
+  { code: 'GDKTPL', name: 'Giáo dục kinh tế và pháp luật' },
   { code: 'TIN', name: 'Tin học' },
-  { code: 'TD', name: 'Thể dục' },
   { code: 'CN', name: 'Công nghệ' },
+  { code: 'AMNHAC', name: 'Âm nhạc' },
+  { code: 'MTHUAT', name: 'Mĩ thuật' },
 ];
 
 module.exports = {

@@ -12,20 +12,50 @@ const roomSlotKey = (room, day, session, period) => {
   return `${r}|${slotKey(day, session, period)}`;
 };
 
+const subjectClassDayKey = (classId, subjectId, day) => `${classId}|${subjectId}|${day}`;
+const subjectClassSessionKey = (classId, subjectId, day, session) =>
+  `${classId}|${subjectId}|${day}|${session}`;
+const roomTypeSlotKey = (roomType, day, session, period) =>
+  `${roomType}|${day}|${session}|${period}`;
+
 const createBusyState = () => ({
   classBusy: new Set(),
   teacherBusy: new Set(),
   roomBusy: new Set(),
+  roomIdBusy: new Set(),
   teacherWeekCount: new Map(),
   classDayCount: new Map(),
+  subjectClassDayCount: new Map(),
+  subjectClassSessionCount: new Map(),
+  roomTypeSlotCount: new Map(),
 });
 
-const loadBusyFromSchedules = (rows, busy) => {
+const scheduleCountsForArrange = (scheduleSemester, arrangeSemester) => {
+  const sem = scheduleSemester ?? 0;
+  return sem === 0 || sem === arrangeSemester;
+};
+
+const loadBusyFromSchedules = (rows, busy, arrangeSemester = null) => {
   for (const s of rows) {
+    if (arrangeSemester != null && !scheduleCountsForArrange(s.semester, arrangeSemester)) {
+      continue;
+    }
     busy.classBusy.add(classSlotKey(s.class_id, s.day_of_week, s.session, s.period));
     busy.teacherBusy.add(teacherSlotKey(s.teacher_id, s.day_of_week, s.session, s.period));
     const rk = roomSlotKey(s.room, s.day_of_week, s.session, s.period);
     if (rk) busy.roomBusy.add(rk);
+    if (s.room_id) {
+      busy.roomIdBusy.add(`${s.room_id}|${slotKey(s.day_of_week, s.session, s.period)}`);
+    }
+    const sdk = subjectClassDayKey(s.class_id, s.subject_id, s.day_of_week);
+    busy.subjectClassDayCount.set(sdk, (busy.subjectClassDayCount.get(sdk) || 0) + 1);
+    const ssk = subjectClassSessionKey(s.class_id, s.subject_id, s.day_of_week, s.session);
+    busy.subjectClassSessionCount.set(ssk, (busy.subjectClassSessionCount.get(ssk) || 0) + 1);
+    const rt = s.room_type || s.roomRef?.room_type;
+    if (rt) {
+      const rtk = roomTypeSlotKey(rt, s.day_of_week, s.session, s.period);
+      busy.roomTypeSlotCount.set(rtk, (busy.roomTypeSlotCount.get(rtk) || 0) + 1);
+    }
     busy.teacherWeekCount.set(
       s.teacher_id,
       (busy.teacherWeekCount.get(s.teacher_id) || 0) + 1,
@@ -49,21 +79,39 @@ const isSlotFree = (busy, classId, teacherId, slot, room = null) => {
   return true;
 };
 
-const occupySlot = (busy, classId, teacherId, slot, room = null) => {
+const occupySlot = (busy, classId, teacherId, slot, room = null, meta = {}) => {
+  const { subjectId, roomId, roomType } = meta;
   busy.classBusy.add(classSlotKey(classId, slot.day_of_week, slot.session, slot.period));
   busy.teacherBusy.add(teacherSlotKey(teacherId, slot.day_of_week, slot.session, slot.period));
   const rk = roomSlotKey(room, slot.day_of_week, slot.session, slot.period);
   if (rk) busy.roomBusy.add(rk);
+  if (roomId) {
+    busy.roomIdBusy.add(`${roomId}|${slotKey(slot.day_of_week, slot.session, slot.period)}`);
+  }
   busy.teacherWeekCount.set(teacherId, (busy.teacherWeekCount.get(teacherId) || 0) + 1);
   const dk = classDayKey(classId, slot.day_of_week);
   busy.classDayCount.set(dk, (busy.classDayCount.get(dk) || 0) + 1);
+  if (subjectId != null) {
+    const sdk = subjectClassDayKey(classId, subjectId, slot.day_of_week);
+    busy.subjectClassDayCount.set(sdk, (busy.subjectClassDayCount.get(sdk) || 0) + 1);
+    const ssk = subjectClassSessionKey(classId, subjectId, slot.day_of_week, slot.session);
+    busy.subjectClassSessionCount.set(ssk, (busy.subjectClassSessionCount.get(ssk) || 0) + 1);
+  }
+  if (roomType) {
+    const rtk = roomTypeSlotKey(roomType, slot.day_of_week, slot.session, slot.period);
+    busy.roomTypeSlotCount.set(rtk, (busy.roomTypeSlotCount.get(rtk) || 0) + 1);
+  }
 };
 
-const releaseSlot = (busy, classId, teacherId, slot, room = null) => {
+const releaseSlot = (busy, classId, teacherId, slot, room = null, meta = {}) => {
+  const { subjectId, roomId, roomType } = meta;
   busy.classBusy.delete(classSlotKey(classId, slot.day_of_week, slot.session, slot.period));
   busy.teacherBusy.delete(teacherSlotKey(teacherId, slot.day_of_week, slot.session, slot.period));
   const rk = roomSlotKey(room, slot.day_of_week, slot.session, slot.period);
   if (rk) busy.roomBusy.delete(rk);
+  if (roomId) {
+    busy.roomIdBusy.delete(`${roomId}|${slotKey(slot.day_of_week, slot.session, slot.period)}`);
+  }
   const next = (busy.teacherWeekCount.get(teacherId) || 1) - 1;
   if (next <= 0) busy.teacherWeekCount.delete(teacherId);
   else busy.teacherWeekCount.set(teacherId, next);
@@ -71,6 +119,22 @@ const releaseSlot = (busy, classId, teacherId, slot, room = null) => {
   const dayNext = (busy.classDayCount.get(dk) || 1) - 1;
   if (dayNext <= 0) busy.classDayCount.delete(dk);
   else busy.classDayCount.set(dk, dayNext);
+  if (subjectId != null) {
+    const sdk = subjectClassDayKey(classId, subjectId, slot.day_of_week);
+    const sdNext = (busy.subjectClassDayCount.get(sdk) || 1) - 1;
+    if (sdNext <= 0) busy.subjectClassDayCount.delete(sdk);
+    else busy.subjectClassDayCount.set(sdk, sdNext);
+    const ssk = subjectClassSessionKey(classId, subjectId, slot.day_of_week, slot.session);
+    const ssNext = (busy.subjectClassSessionCount.get(ssk) || 1) - 1;
+    if (ssNext <= 0) busy.subjectClassSessionCount.delete(ssk);
+    else busy.subjectClassSessionCount.set(ssk, ssNext);
+  }
+  if (roomType) {
+    const rtk = roomTypeSlotKey(roomType, slot.day_of_week, slot.session, slot.period);
+    const rtNext = (busy.roomTypeSlotCount.get(rtk) || 1) - 1;
+    if (rtNext <= 0) busy.roomTypeSlotCount.delete(rtk);
+    else busy.roomTypeSlotCount.set(rtk, rtNext);
+  }
 };
 
 const slotEquals = (a, b) =>
@@ -94,6 +158,10 @@ module.exports = {
   teacherSlotKey,
   classDayKey,
   roomSlotKey,
+  subjectClassDayKey,
+  subjectClassSessionKey,
+  roomTypeSlotKey,
+  scheduleCountsForArrange,
   createBusyState,
   loadBusyFromSchedules,
   isSlotFree,

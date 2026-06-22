@@ -1,10 +1,9 @@
 /**
  * Attendance controller — điểm danh (SRS 2.5).
- * Cảnh báo PH qua email khi vắng không phép.
+ * v2.0: Smart Attendance Digest — hoãn gửi email 15 phút, hỗ trợ trạng thái 'late'.
  */
 const { Op } = require('sequelize');
-const { Attendance, Student, User, Class } = require('../models');
-const { sendAbsenceAlert } = require('../services/email.service');
+const { Attendance, Student, User, Class, PendingAttendanceAlert } = require('../models');
 const { success, error } = require('../utils/responseHelper');
 
 const mark = async (req, res) => {
@@ -29,24 +28,70 @@ const mark = async (req, res) => {
         await Attendance.create({ ...item, marked_by: req.user.id });
       }
       upserted += 1;
-    }
 
-    // Gửi email cho các trường hợp vắng không phép
-    for (const item of items) {
+      // v2.0: Tạo pending alert khi vắng (không gửi email ngay)
       if (item.status === 'absent') {
+        // Hủy alert cũ nếu có (tránh duplicate)
+        await PendingAttendanceAlert.update(
+          { status: 'cancelled' },
+          { where: { student_id: item.student_id, attendance_date: item.attendance_date, status: 'pending' } },
+        );
+
+        // Tìm email PH
         const student = await Student.findByPk(item.student_id, {
-          include: [{ model: User, as: 'parents' }, { model: User, as: 'user' }],
+          include: [{ model: User, as: 'parents' }],
         });
-        for (const parent of student?.parents || []) {
-          sendAbsenceAlert(parent.email, student.user.full_name, item.attendance_date)
-            .catch((e) => console.error('[EMAIL] Absence alert failed:', e.message));
-        }
+        const parentEmail = student?.parents?.[0]?.email || null;
+
+        await PendingAttendanceAlert.create({
+          student_id: item.student_id,
+          attendance_date: item.attendance_date,
+          schedule_id: item.schedule_id || null,
+          parent_email: parentEmail,
+          status: 'pending',
+        });
+      }
+
+      // v2.0: Nếu sửa thành 'late' (đi muộn) → hủy pending alert
+      if (item.status === 'late') {
+        await PendingAttendanceAlert.update(
+          { status: 'cancelled' },
+          { where: { student_id: item.student_id, attendance_date: item.attendance_date, status: 'pending' } },
+        );
+      }
+
+      // v2.0: Nếu sửa thành 'present' → hủy pending alert
+      if (item.status === 'present') {
+        await PendingAttendanceAlert.update(
+          { status: 'cancelled' },
+          { where: { student_id: item.student_id, attendance_date: item.attendance_date, status: 'pending' } },
+        );
       }
     }
 
     return success(res, { count: upserted }, 'Điểm danh thành công', 201);
   } catch (err) {
     return error(res, 'Điểm danh thất bại', 400, err.message);
+  }
+};
+
+/** PATCH /attendance/:id/late — Cập nhật trạng thái đi muộn */
+const markLate = async (req, res) => {
+  try {
+    const attendance = await Attendance.findByPk(req.params.id);
+    if (!attendance) return error(res, 'Không tìm thấy bản ghi', 404);
+
+    await attendance.update({ status: 'late', marked_by: req.user.id });
+
+    // Hủy pending alert
+    await PendingAttendanceAlert.update(
+      { status: 'cancelled' },
+      { where: { student_id: attendance.student_id, attendance_date: attendance.attendance_date, status: 'pending' } },
+    );
+
+    return success(res, attendance, 'Đã chuyển sang đi muộn');
+  } catch (err) {
+    return error(res, 'Lỗi cập nhật', 400, err.message);
   }
 };
 
@@ -97,4 +142,4 @@ const listByStudent = async (req, res) => {
   }
 };
 
-module.exports = { mark, listByClass, listByStudent };
+module.exports = { mark, markLate, listByClass, listByStudent };
